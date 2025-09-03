@@ -3,5 +3,5 @@ An [SVG](https://en.wikipedia.org/wiki/SVG) editor inspired by [Glaxnimate](http
 Features:
 [x] Online
 [x] No Dependencies
-[ ] Brush tool
-[ ] Animation
+[] Brush tool
+[] Animation
