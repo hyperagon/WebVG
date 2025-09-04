@@ -1,0 +1,1518 @@
+<!--
+Make a javascript SVG editor called Webnimate with the following features:
+> CSS Menu at the top, should allow you to:
+    File
+        - New
+        - Open (JSON)
+        - Import (SVG, RAWR, Image)
+        - Save (to JSON)
+        - Export SVG, RAWR
+    Edit
+        - Undo (Ctrl+Z)
+        - Redo (Ctrl+Shift+Z)
+        - Copy (Ctrl+C)
+        - Paste (Ctrl+V)
+        - Duplicate
+    View
+        - Zoom in (Mousewheel up)
+        - Zoom out (Mousewheel down)
+        - Pan (Right-mouse button or two-finger drag)
+> Tools on a left pane, these are single icon with a tooltip:
+    - Select or Ctrl+Select to show its sub-handles), can drag selected shappes to move them.
+    - Line (no fill)
+    - Free-hand line / Brush (no fill, settings to smooth/optimize the lines like in Wick Editor)
+    - Rectangle (with a sub-handle to make it round)
+    - Circle (with sub-handles to make it miss a section)
+    - Polygon (with options to set how many corners, the spoke ratio, etc)
+    - Text (CSS popup for its contents)
+> The right panel has tabs for:
+    - Tool Options, lets you pick the fill and stroke of a shape as well as extra tool-related options
+    - Objects in the SVG
+
+implement whatever is missing, no comments or promises to do it later. DO IT NOW 
+It should have no dependencies
+-->
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webnimate</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        /* Top Menu Bar */
+        .menu-bar {
+            background-color: #2c3e50;
+            color: white;
+            display: flex;
+            padding: 0;
+            user-select: none;
+            z-index: 100;
+        }
+        .menu-item {
+            position: relative;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .menu-item:hover {
+            background-color: #34495e;
+        }
+        .dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #2c3e50;
+            display: none;
+            min-width: 200px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .menu-item:hover .dropdown {
+            display: block;
+        }
+        .dropdown-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .dropdown-item:hover {
+            background-color: #34495e;
+        }
+        .dropdown-divider {
+            height: 1px;
+            background-color: #34495e;
+            margin: 5px 0;
+        }
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        /* Left Tools Panel */
+        .tools-panel {
+            background-color: #34495e;
+            width: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 0;
+            overflow-y: auto;
+        }
+        .tool-button {
+            width: 40px;
+            height: 40px;
+            margin: 5px 0;
+            background-color: #2c3e50;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: background-color 0.2s;
+        }
+        .tool-button:hover {
+            background-color: #1a252f;
+        }
+        .tool-button.active {
+            background-color: #3498db;
+        }
+        .tooltip {
+            position: absolute;
+            left: 50px;
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 50;
+        }
+        .tool-button:hover .tooltip {
+            opacity: 1;
+        }
+        /* Canvas Area */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-color: #ecf0f1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #canvas {
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        /* Right Panel */
+        .right-panel {
+            width: 300px;
+            background-color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #bdc3c7;
+        }
+        .tabs {
+            display: flex;
+            background-color: #34495e;
+        }
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .tab:hover {
+            background-color: #2c3e50;
+        }
+        .tab.active {
+            background-color: #3498db;
+        }
+        .tab-content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+        }
+        .color-input {
+            height: 40px;
+            padding: 5px;
+            cursor: pointer;
+        }
+        /* File Input */
+        .file-input {
+            display: none;
+        }
+        /* Notification */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s, transform 0.3s;
+            z-index: 200;
+        }
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* Text Popup */
+        .text-popup {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            display: none;
+            z-index: 150;
+        }
+        .text-popup input {
+            width: 200px;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .text-popup button {
+            padding: 8px 15px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .text-popup button:hover {
+            background-color: #2980b9;
+        }
+        /* Selection Handles */
+        .selection-handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #3498db;
+            border: 1px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+        }
+        .selection-box {
+            position: absolute;
+            border: 1px dashed #3498db;
+            pointer-events: none;
+        }
+        /* Object List Styles *//* Object List Styles */
+        .object-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .object-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .object-item.selected {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .delete-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 3px 8px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .delete-btn:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Menu Bar -->
+    <div class="menu-bar">
+        <div class="menu-item">
+            File
+            <div class="dropdown">
+                <div class="dropdown-item" id="menu-new">New</div>
+                <div class="dropdown-item" id="menu-open-json">Open (JSON)</div>
+                <div class="dropdown-item" id="menu-import-svg">Import (SVG)</div>
+                <div class="dropdown-item" id="menu-import-inkscape">Import (Inkscape SVG)</div>
+                <div class="dropdown-item" id="menu-import-rawr">Import (RAWR)</div>
+                <div class="dropdown-item" id="menu-import-image">Import (Image)</div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item" id="menu-save-json">Save (to JSON)</div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item" id="menu-export-svg">Export SVG</div>
+                <div class="dropdown-item" id="menu-export-rawr">Export RAWR</div>
+            </div>
+        </div>
+        <div class="menu-item">
+            Edit
+            <div class="dropdown">
+                <div class="dropdown-item" id="menu-undo">Undo (Ctrl+Z)</div>
+                <div class="dropdown-item" id="menu-redo">Redo (Ctrl+Shift+Z)</div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item" id="menu-copy">Copy (Ctrl+C)</div>
+                <div class="dropdown-item" id="menu-paste">Paste (Ctrl+V)</div>
+                <div class="dropdown-item" id="menu-duplicate">Duplicate</div>
+            </div>
+        </div>
+        <div class="menu-item">
+            View
+            <div class="dropdown">
+                <div class="dropdown-item" id="menu-zoom-in">Zoom In (+)</div>
+                <div class="dropdown-item" id="menu-zoom-out">Zoom Out (-)</div>
+                <div class="dropdown-item" id="menu-reset-zoom">Reset Zoom (Enter)</div>
+            </div>
+        </div>
+    </div>
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Tools Panel -->
+        <div class="tools-panel">
+            <button class="tool-button active" data-tool="select">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                    <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
+                </svg>
+                <span class="tooltip">Select</span>
+            </button>
+            <button class="tool-button" data-tool="line">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <line x1="5" y1="19" x2="19" y2="5"></line>
+                </svg>
+                <span class="tooltip">Line</span>
+            </button>
+            <button class="tool-button" data-tool="brush">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                    <path d="M20.71,4.63L19.37,3.29C19,2.9 18.35,2.9 17.96,3.29L9,12.25L11.75,15L20.71,6.04C21.1,5.65 21.1,5 20.71,4.63M7,14A3,3 0 0,0 4,17C4,18.31 2.84,19 2,19C2.92,20.22 4.5,21 6,21A4,4 0 0,0 10,17A3,3 0 0,0 7,14Z"></path>
+                </svg>
+                <span class="tooltip">Brush</span>
+            </button>
+            <button class="tool-button" data-tool="rectangle">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                </svg>
+                <span class="tooltip">Rectangle</span>
+            </button>
+            <button class="tool-button" data-tool="circle">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <circle cx="12" cy="12" r="9"></circle>
+                </svg>
+                <span class="tooltip">Circle</span>
+            </button>
+            <button class="tool-button" data-tool="polygon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <polygon points="12,2 22,8.5 18.5,20 5.5,20 2,8.5"></polygon>
+                </svg>
+                <span class="tooltip">Polygon</span>
+            </button>
+            <button class="tool-button" data-tool="text">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                    <path d="M18.5,4L19.66,8.35L18.7,8.61C18.25,7.74 17.79,6.87 17.26,6.43C16.73,6 16.11,6 15.5,6H13V16.5C13,17 13,17.5 13.33,17.75C13.67,18 14.33,18 15,18V19H9V18C9.67,18 10.33,18 10.67,17.75C11,17.5 11,17 11,16.5V6H8.5C7.89,6 7.27,6 6.74,6.43C6.21,6.87 5.75,7.74 5.3,8.61L4.34,8.35L5.5,4H18.5Z"></path>
+                </svg>
+                <span class="tooltip">Text</span>
+            </button>
+        </div>
+        <!-- Canvas Area -->
+        <div class="canvas-container" id="canvas-container">
+            <svg id="canvas" width="800" height="600" viewBox="0 0 800 600">
+                <!-- SVG content will be added here -->
+            </svg>
+            <div class="selection-box" id="selection-box"></div>
+        </div>
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <div class="tabs">
+                <div class="tab active" data-tab="tool-options">Tool Options</div>
+                <div class="tab" data-tab="objects">Objects</div>
+            </div>
+            
+            <div class="tab-content active" id="tool-options">
+                <div class="form-group">
+                    <label for="fill-color">Fill Color</label>
+                    <input type="color" id="fill-color" class="color-input" value="#ffffff">
+                </div>
+                <div class="form-group">
+                    <label for="stroke-color">Stroke Color</label>
+                    <input type="color" id="stroke-color" class="color-input" value="#000000">
+                </div>
+                <div class="form-group">
+                    <label for="stroke-width">Stroke Width</label>
+                    <input type="number" id="stroke-width" min="0" max="50" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="opacity">Opacity</label>
+                    <input type="range" id="opacity" min="0" max="1" step="0.01" value="1">
+                </div>
+                
+                <!-- Tool-specific options will be added here dynamically -->
+                <div id="tool-specific-options"></div>
+            </div>
+            
+            <div class="tab-content" id="objects">
+                <div class="form-group">
+                    <label>Objects in Frame</label>
+                    <div id="objects-list">
+                        <p>No objects in the current frame.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Text Popup -->
+    <div class="text-popup" id="text-popup">
+        <input type="text" id="text-input" placeholder="Enter text here">
+        <button id="text-ok">OK</button>
+        <button id="text-cancel">Cancel</button>
+    </div>
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+    <!-- Hidden File Inputs -->
+    <input type="file" id="file-open-json" class="file-input" accept=".json">
+    <input type="file" id="file-import-svg" class="file-input" accept=".svg">
+    <input type="file" id="file-import-inkscape" class="file-input" accept=".svg">
+    <input type="file" id="file-import-rawr" class="file-input" accept=".rawr">
+    <input type="file" id="file-import-image" class="file-input" accept="image/*">
+    <script>
+        // Global variables
+        let currentTool = 'select';
+        let isDrawing = false;
+        let isDragging = false;
+        let startX, startY;
+        let currentElement = null;
+        let selectedElement = null;
+        let history = [];
+        let historyStep = -1;
+        let clipboard = null;
+        let zoomLevel = 1;
+        let panX = 0, panY = 0;
+        let isPanning = false;
+        let panStartX, panStartY;
+        let brushPath = '';
+        let brushPoints = [];
+        let brushSmoothing = 0.2;
+        let elementStartX, elementStartY;
+        let selectionBoxStartX, selectionBoxStartY;
+        
+        // Get DOM elements
+        const canvas = document.getElementById('canvas');
+        const canvasContainer = document.getElementById('canvas-container');
+        const selectionBox = document.getElementById('selection-box');
+        const fillColorInput = document.getElementById('fill-color');
+        const strokeColorInput = document.getElementById('stroke-color');
+        const strokeWidthInput = document.getElementById('stroke-width');
+        const opacityInput = document.getElementById('opacity');
+        const toolSpecificOptions = document.getElementById('tool-specific-options');
+        const objectsList = document.getElementById('objects-list');
+        const textPopup = document.getElementById('text-popup');
+        const textInput = document.getElementById('text-input');
+        const notification = document.getElementById('notification');
+        
+        // Initialize the editor
+        function init() {
+            // Set up tool buttons
+            document.querySelectorAll('.tool-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    selectTool(button.dataset.tool);
+                });
+            });
+            
+            // Set up menu items
+            document.getElementById('menu-new').addEventListener('click', newFile);
+            document.getElementById('menu-open-json').addEventListener('click', () => {
+                document.getElementById('file-open-json').click();
+            });
+            document.getElementById('menu-import-svg').addEventListener('click', () => {
+                document.getElementById('file-import-svg').click();
+            });
+            document.getElementById('menu-import-inkscape').addEventListener('click', () => {
+                document.getElementById('file-import-inkscape').click();
+            });
+            document.getElementById('menu-import-rawr').addEventListener('click', () => {
+                document.getElementById('file-import-rawr').click();
+            });
+            document.getElementById('menu-import-image').addEventListener('click', () => {
+                document.getElementById('file-import-image').click();
+            });
+            document.getElementById('menu-save-json').addEventListener('click', saveAsJSON);
+            document.getElementById('menu-export-svg').addEventListener('click', exportAsSVG);
+            document.getElementById('menu-export-rawr').addEventListener('click', exportAsRAWR);
+            document.getElementById('menu-undo').addEventListener('click', undo);
+            document.getElementById('menu-redo').addEventListener('click', redo);
+            document.getElementById('menu-copy').addEventListener('click', copy);
+            document.getElementById('menu-paste').addEventListener('click', paste);
+            document.getElementById('menu-duplicate').addEventListener('click', duplicate);
+            document.getElementById('menu-zoom-in').addEventListener('click', () => zoom(1.2));
+            document.getElementById('menu-zoom-out').addEventListener('click', () => zoom(0.8));
+            document.getElementById('menu-reset-zoom').addEventListener('click', resetZoom);
+            
+            // Set up file inputs
+            document.getElementById('file-open-json').addEventListener('change', openJSON);
+            document.getElementById('file-import-svg').addEventListener('change', importSVG);
+            document.getElementById('file-import-inkscape').addEventListener('change', importInkscapeSVG);
+            document.getElementById('file-import-rawr').addEventListener('change', importRAWR);
+            document.getElementById('file-import-image').addEventListener('change', importImage);
+            
+            // Set up tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab).classList.add('active');
+                });
+            });
+            
+            // Set up text popup
+            document.getElementById('text-ok').addEventListener('click', addText);
+            document.getElementById('text-cancel').addEventListener('click', () => {
+                textPopup.style.display = 'none';
+            });
+            
+            // Set up canvas events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('wheel', handleWheel);
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+            
+            // Set up keyboard shortcuts
+            document.addEventListener('keydown', handleKeyDown);
+            
+            // Initialize tool-specific options
+            updateToolSpecificOptions();
+            
+            // Save initial state
+            saveHistory();
+        }
+        
+        // Tool selection
+        function selectTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+            updateToolSpecificOptions();
+            clearSelection();
+        }
+        
+        // Update tool-specific options
+        function updateToolSpecificOptions() {
+            toolSpecificOptions.innerHTML = '';
+            
+            switch(currentTool) {
+                case 'brush':
+                    const brushGroup = document.createElement('div');
+                    brushGroup.className = 'form-group';
+                    brushGroup.innerHTML = `
+                        <label for="brush-smoothing">Smoothing</label>
+                        <input type="range" id="brush-smoothing" min="0" max="1" step="0.05" value="${brushSmoothing}">
+                    `;
+                    toolSpecificOptions.appendChild(brushGroup);
+                    
+                    document.getElementById('brush-smoothing').addEventListener('input', (e) => {
+                        brushSmoothing = parseFloat(e.target.value);
+                    });
+                    break;
+                    
+                case 'polygon':
+                    const polygonGroup = document.createElement('div');
+                    polygonGroup.className = 'form-group';
+                    polygonGroup.innerHTML = `
+                        <label for="polygon-sides">Number of Sides</label>
+                        <input type="number" id="polygon-sides" min="3" max="20" value="6">
+                        
+                        <label for="polygon-ratio">Spoke Ratio</label>
+                        <input type="range" id="polygon-ratio" min="0" max="1" step="0.01" value="0.5">
+                    `;
+                    toolSpecificOptions.appendChild(polygonGroup);
+                    break;
+            }
+        }
+        
+        // Drawing functions
+        function startDrawing(e) {
+            if (e.button === 2) { // Right mouse button
+                isPanning = true;
+                panStartX = e.clientX - panX;
+                panStartY = e.clientY - panY;
+                canvasContainer.style.cursor = 'grabbing';
+                return;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            startX = (e.clientX - rect.left - panX) / zoomLevel;
+            startY = (e.clientY - rect.top - panY) / zoomLevel;
+            
+            if (currentTool === 'select') {
+                const target = e.target;
+                if (target !== canvas) {
+                    selectElement(target);
+                    
+                    // Check if we're starting to drag the selected element
+                    if (selectedElement === target) {
+                        isDragging = true;
+                        dragStartX = startX;
+                        dragStartY = startY;
+                        
+                        // Get element's starting position
+                        const pos = getElementPosition(selectedElement);
+                        elementStartX = pos.x;
+                        elementStartY = pos.y;
+                        
+                        // Store selection box starting position
+                        selectionBoxStartX = parseFloat(selectionBox.style.left);
+                        selectionBoxStartY = parseFloat(selectionBox.style.top);
+                    }
+                } else {
+                    clearSelection();
+                }
+            } else if (currentTool === 'text') {
+                showTextPopup(e.clientX, e.clientY);
+            } else {
+                isDrawing = true;
+                createNewElement();
+            }
+        }
+        
+        function draw(e) {
+            if (isPanning) {
+                panX = e.clientX - panStartX;
+                panY = e.clientY - panStartY;
+                updateCanvasTransform();
+                return;
+            }
+            
+            if (isDragging && selectedElement) {
+                const rect = canvas.getBoundingClientRect();
+                const currentX = (e.clientX - rect.left - panX) / zoomLevel;
+                const currentY = (e.clientY - rect.top - panY) / zoomLevel;
+                
+                const deltaX = currentX - dragStartX;
+                const deltaY = currentY - dragStartY;
+                
+                // Update element position
+                setElementPosition(selectedElement, elementStartX + deltaX, elementStartY + deltaY);
+                
+                // Update selection box position
+                selectionBox.style.left = `${selectionBoxStartX + deltaX * zoomLevel}px`;
+                selectionBox.style.top = `${selectionBoxStartY + deltaY * zoomLevel}px`;
+                
+                return;
+            }
+            
+            if (!isDrawing || !currentElement) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const currentX = (e.clientX - rect.left - panX) / zoomLevel;
+            const currentY = (e.clientY - rect.top - panY) / zoomLevel;
+            
+            switch(currentTool) {
+                case 'line':
+                    currentElement.setAttribute('x2', currentX);
+                    currentElement.setAttribute('y2', currentY);
+                    break;
+                    
+                case 'brush':
+                    brushPoints.push({x: currentX, y: currentY});
+                    updateBrushPath();
+                    break;
+                    
+                case 'rectangle':
+                    const width = Math.abs(currentX - startX);
+                    const height = Math.abs(currentY - startY);
+                    const x = Math.min(startX, currentX);
+                    const y = Math.min(startY, currentY);
+                    
+                    currentElement.setAttribute('x', x);
+                    currentElement.setAttribute('y', y);
+                    currentElement.setAttribute('width', width);
+                    currentElement.setAttribute('height', height);
+                    break;
+                    
+                case 'circle':
+                    const radius = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
+                    currentElement.setAttribute('r', radius);
+                    break;
+                    
+                case 'polygon':
+                    updatePolygon(currentX, currentY);
+                    break;
+            }
+        }
+        
+        function stopDrawing() {
+            if (isPanning) {
+                isPanning = false;
+                canvasContainer.style.cursor = 'default';
+                return;
+            }
+            
+            if (isDragging) {
+                isDragging = false;
+                saveHistory();
+                return;
+            }
+            
+            if (!isDrawing) return;
+            
+            isDrawing = false;
+            
+            if (currentElement) {
+                // Apply current styles
+                applyStyles(currentElement);
+                
+                // Save to history
+                saveHistory();
+                
+                // Update objects list
+                updateObjectsList();
+            }
+            
+            currentElement = null;
+            brushPoints = [];
+            brushPath = '';
+        }
+        
+        function createNewElement() {
+            const fillColor = fillColorInput.value;
+            const strokeColor = strokeColorInput.value;
+            const strokeWidth = strokeWidthInput.value;
+            const opacity = opacityInput.value;
+            
+            switch(currentTool) {
+                case 'line':
+                    currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    currentElement.setAttribute('x1', startX);
+                    currentElement.setAttribute('y1', startY);
+                    currentElement.setAttribute('x2', startX);
+                    currentElement.setAttribute('y2', startY);
+                    currentElement.setAttribute('fill', 'none');
+                    break;
+                    
+                case 'brush':
+                    currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    brushPoints = [{x: startX, y: startY}];
+                    brushPath = `M ${startX} ${startY}`;
+                    currentElement.setAttribute('d', brushPath);
+                    currentElement.setAttribute('fill', 'none');
+                    break;
+                    
+                case 'rectangle':
+                    currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    currentElement.setAttribute('x', startX);
+                    currentElement.setAttribute('y', startY);
+                    currentElement.setAttribute('width', 0);
+                    currentElement.setAttribute('height', 0);
+                    break;
+                    
+                case 'circle':
+                    currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    currentElement.setAttribute('cx', startX);
+                    currentElement.setAttribute('cy', startY);
+                    currentElement.setAttribute('r', 0);
+                    break;
+                    
+                case 'polygon':
+                    currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    updatePolygon(startX, startY);
+                    break;
+            }
+            
+            if (currentElement) {
+                canvas.appendChild(currentElement);
+            }
+        }
+        
+        function applyStyles(element) {
+            const fillColor = fillColorInput.value;
+            const strokeColor = strokeColorInput.value;
+            const strokeWidth = strokeWidthInput.value;
+            const opacity = opacityInput.value;
+            
+            if (element.tagName !== 'line' && element.tagName !== 'path') {
+                element.setAttribute('fill', fillColor);
+            }
+            
+            element.setAttribute('stroke', strokeColor);
+            element.setAttribute('stroke-width', strokeWidth);
+            element.setAttribute('opacity', opacity);
+        }
+        
+        function updateBrushPath() {
+            if (brushPoints.length < 2) return;
+            
+            // Simplify the path using smoothing
+            let simplifiedPath = `M ${brushPoints[0].x} ${brushPoints[0].y}`;
+            
+            for (let i = 1; i < brushPoints.length - 1; i++) {
+                const xc = (brushPoints[i].x + brushPoints[i + 1].x) / 2;
+                const yc = (brushPoints[i].y + brushPoints[i + 1].y) / 2;
+                simplifiedPath += ` Q ${brushPoints[i].x} ${brushPoints[i].y}, ${xc} ${yc}`;
+            }
+            
+            // Add the last point
+            simplifiedPath += ` L ${brushPoints[brushPoints.length - 1].x} ${brushPoints[brushPoints.length - 1].y}`;
+            
+            currentElement.setAttribute('d', simplifiedPath);
+        }
+        
+        function updatePolygon(currentX, currentY) {
+            const sides = parseInt(document.getElementById('polygon-sides')?.value || 6);
+            const ratio = parseFloat(document.getElementById('polygon-ratio')?.value || 0.5);
+            
+            const centerX = startX;
+            const centerY = startY;
+            const radius = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
+            
+            let points = '';
+            
+            for (let i = 0; i < sides * 2; i++) {
+                const angle = (i * Math.PI) / sides;
+                const r = i % 2 === 0 ? radius : radius * ratio;
+                const x = centerX + r * Math.cos(angle);
+                const y = centerY + r * Math.sin(angle);
+                
+                points += `${x},${y} `;
+            }
+            
+            currentElement.setAttribute('points', points.trim());
+        }
+        
+        // Text functions
+        function showTextPopup(x, y) {
+            textPopup.style.left = `${x}px`;
+            textPopup.style.top = `${y}px`;
+            textPopup.style.display = 'block';
+            textInput.value = '';
+            textInput.focus();
+        }
+        
+        function addText() {
+            const text = textInput.value.trim();
+            if (!text) {
+                textPopup.style.display = 'none';
+                return;
+            }
+            
+            const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            textElement.setAttribute('x', startX);
+            textElement.setAttribute('y', startY);
+            textElement.setAttribute('fill', fillColorInput.value);
+            textElement.setAttribute('font-family', 'Arial');
+            textElement.setAttribute('font-size', '16');
+            textElement.textContent = text;
+            
+            canvas.appendChild(textElement);
+            
+            saveHistory();
+            updateObjectsList();
+            
+            textPopup.style.display = 'none';
+        }
+        
+    // Selection functions
+    function selectElement(element) {
+        clearSelection();
+        selectedElement = element;
+        const bbox = element.getBBox();
+        const selectionRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        selectionRect.setAttribute('x', bbox.x);
+        selectionRect.setAttribute('y', bbox.y);
+        selectionRect.setAttribute('width', bbox.width);
+        selectionRect.setAttribute('height', bbox.height);
+        selectionRect.setAttribute('fill', 'none');
+        selectionRect.setAttribute('stroke', '#3498db');
+        selectionRect.setAttribute('stroke-width', '1');
+        selectionRect.setAttribute('stroke-dasharray', '5,5');
+        selectionRect.setAttribute('pointer-events', 'none');
+        selectionRect.id = 'svg-selection-box';
+        canvas.appendChild(selectionRect);
+        
+        // Update object list to show which item is selected
+        updateObjectsList();
+    }
+    
+    function clearSelection() {
+        selectedElement = null;
+        const selectionRect = document.getElementById('svg-selection-box');
+        if (selectionRect) {
+            canvas.removeChild(selectionRect);
+        }
+        
+        // Update object list to remove selection highlight
+        updateObjectsList();
+    }
+    
+        // Delete selected element
+        function deleteSelectedElement() {
+            if (selectedElement) {
+                // Remove the selection box first
+                const selectionRect = document.getElementById('svg-selection-box');
+                if (selectionRect) {
+                    canvas.removeChild(selectionRect);
+                }
+                
+                // Remove the element if it's a child of the canvas
+                if (selectedElement.parentNode === canvas) {
+                    canvas.removeChild(selectedElement);
+                }
+                
+                selectedElement = null;
+                
+                saveHistory();
+                updateObjectsList();
+                showNotification('Element deleted');
+            }
+        }
+        
+        // Element position functions
+        function getElementPosition(element) {
+            let x, y;
+            switch(element.tagName) {
+                case 'rect':
+                    x = parseFloat(element.getAttribute('x') || 0);
+                    y = parseFloat(element.getAttribute('y') || 0);
+                    break;
+                case 'circle':
+                    x = parseFloat(element.getAttribute('cx') || 0);
+                    y = parseFloat(element.getAttribute('cy') || 0);
+                    break;
+                case 'line':
+                    x = parseFloat(element.getAttribute('x1') || 0);
+                    y = parseFloat(element.getAttribute('y1') || 0);
+                    break;
+                case 'text':
+                    x = parseFloat(element.getAttribute('x') || 0);
+                    y = parseFloat(element.getAttribute('y') || 0);
+                    break;
+                case 'polygon':
+                    const points = element.getAttribute('points').split(' ')[0].split(',');
+                    x = parseFloat(points[0]);
+                    y = parseFloat(points[1]);
+                    break;
+                case 'path':
+                    const d = element.getAttribute('d');
+                    const match = d.match(/M\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/);
+                    if (match) {
+                        x = parseFloat(match[1]);
+                        y = parseFloat(match[2]);
+                    } else {
+                        x = 0;
+                        y = 0;
+                    }
+                    break;
+                default:
+                    x = 0;
+                    y = 0;
+            }
+            return { x, y };
+        }
+        
+        function setElementPosition(element, x, y) {
+            const currentPos = getElementPosition(element);
+            const deltaX = x - currentPos.x;
+            const deltaY = y - currentPos.y;
+            
+            switch(element.tagName) {
+                case 'rect':
+                    element.setAttribute('x', x);
+                    element.setAttribute('y', y);
+                    break;
+                case 'circle':
+                    element.setAttribute('cx', x);
+                    element.setAttribute('cy', y);
+                    break;
+                case 'line':
+                    const x1 = parseFloat(element.getAttribute('x1'));
+                    const y1 = parseFloat(element.getAttribute('y1'));
+                    const x2 = parseFloat(element.getAttribute('x2'));
+                    const y2 = parseFloat(element.getAttribute('y2'));
+                    element.setAttribute('x1', x1 + deltaX);
+                    element.setAttribute('y1', y1 + deltaY);
+                    element.setAttribute('x2', x2 + deltaX);
+                    element.setAttribute('y2', y2 + deltaY);
+                    break;
+                case 'text':
+                    element.setAttribute('x', x);
+                    element.setAttribute('y', y);
+                    break;
+                case 'polygon':
+                    const points = element.getAttribute('points').split(' ');
+                    const newPoints = points.map(point => {
+                        const [px, py] = point.split(',');
+                        return `${parseFloat(px) + deltaX},${parseFloat(py) + deltaY}`;
+                    });
+                    element.setAttribute('points', newPoints.join(' '));
+                    break;
+                case 'path':
+                    // For path, we'll apply a transform during drag
+                    element.setAttribute('transform', `translate(${deltaX}, ${deltaY})`);
+                    break;
+            }
+        }
+        
+        // History functions
+        function saveHistory() {
+            // Remove any history after the current step
+            history = history.slice(0, historyStep + 1);
+            
+            // Add the current state
+            const svgData = new XMLSerializer().serializeToString(canvas);
+            history.push(svgData);
+            historyStep++;
+            
+            // Limit history size
+            if (history.length > 50) {
+                history.shift();
+                historyStep--;
+            }
+        }
+        
+        function undo() {
+            if (historyStep > 0) {
+                historyStep--;
+                restoreState(history[historyStep]);
+            }
+        }
+        
+        function redo() {
+            if (historyStep < history.length - 1) {
+                historyStep++;
+                restoreState(history[historyStep]);
+            }
+        }
+        
+        function restoreState(svgData) {
+            // Clear the canvas
+            while (canvas.firstChild) {
+                canvas.removeChild(canvas.firstChild);
+            }
+            
+            // Parse the SVG data and add it to the canvas
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgData, 'image/svg+xml');
+            const svgElements = doc.querySelectorAll('svg > *');
+            
+            svgElements.forEach(element => {
+                canvas.appendChild(document.importNode(element, true));
+            });
+            
+            updateObjectsList();
+            clearSelection();
+        }
+        
+        // Clipboard functions
+        function copy() {
+            if (selectedElement) {
+                clipboard = selectedElement.cloneNode(true);
+                showNotification('Copied to clipboard');
+            }
+        }
+        
+        function paste() {
+            if (clipboard) {
+                const newElement = clipboard.cloneNode(true);
+                
+                // Offset the pasted element slightly
+                if (newElement.hasAttribute('x')) {
+                    newElement.setAttribute('x', parseFloat(newElement.getAttribute('x')) + 10);
+                }
+                if (newElement.hasAttribute('y')) {
+                    newElement.setAttribute('y', parseFloat(newElement.getAttribute('y')) + 10);
+                }
+                if (newElement.hasAttribute('cx')) {
+                    newElement.setAttribute('cx', parseFloat(newElement.getAttribute('cx')) + 10);
+                }
+                if (newElement.hasAttribute('cy')) {
+                    newElement.setAttribute('cy', parseFloat(newElement.getAttribute('cy')) + 10);
+                }
+                
+                canvas.appendChild(newElement);
+                selectElement(newElement);
+                saveHistory();
+                updateObjectsList();
+                showNotification('Pasted from clipboard');
+            }
+        }
+        
+        function duplicate() {
+            if (selectedElement) {
+                const newElement = selectedElement.cloneNode(true);
+                
+                // Offset the duplicated element slightly
+                if (newElement.hasAttribute('x')) {
+                    newElement.setAttribute('x', parseFloat(newElement.getAttribute('x')) + 10);
+                }
+                if (newElement.hasAttribute('y')) {
+                    newElement.setAttribute('y', parseFloat(newElement.getAttribute('y')) + 10);
+                }
+                if (newElement.hasAttribute('cx')) {
+                    newElement.setAttribute('cx', parseFloat(newElement.getAttribute('cx')) + 10);
+                }
+                if (newElement.hasAttribute('cy')) {
+                    newElement.setAttribute('cy', parseFloat(newElement.getAttribute('cy')) + 10);
+                }
+                
+                canvas.appendChild(newElement);
+                selectElement(newElement);
+                saveHistory();
+                updateObjectsList();
+                showNotification('Duplicated element');
+            }
+        }
+        
+        // Zoom and pan functions
+        function zoom(factor) {
+            zoomLevel *= factor;
+            zoomLevel = Math.max(0.1, Math.min(5, zoomLevel));
+            updateCanvasTransform();
+        }
+        
+        function resetZoom() {
+            zoomLevel = 1;
+            panX = 0;
+            panY = 0;
+            updateCanvasTransform();
+        }
+        
+        function updateCanvasTransform() {
+            canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+            canvas.style.transformOrigin = '0 0';
+        }
+        
+        function handleWheel(e) {
+            e.preventDefault();
+            
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom with Ctrl/Cmd + wheel
+                const factor = e.deltaY > 0 ? 0.9 : 1.1;
+                zoom(factor);
+            } else {
+                // Pan with wheel
+                panX -= e.deltaX;
+                panY -= e.deltaY;
+                updateCanvasTransform();
+            }
+        }
+        
+        // File operations
+        function newFile() {
+            if (confirm('Are you sure you want to create a new file? Unsaved changes will be lost.')) {
+                while (canvas.firstChild) {
+                    canvas.removeChild(canvas.firstChild);
+                }
+                saveHistory();
+                updateObjectsList();
+                clearSelection();
+                showNotification('New file created');
+            }
+        }
+        
+        function openJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    restoreState(data.svg);
+                    showNotification('File opened successfully');
+                } catch (error) {
+                    showNotification('Error opening file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function saveAsJSON() {
+            const svgData = new XMLSerializer().serializeToString(canvas);
+            const data = {
+                svg: svgData,
+                timestamp: new Date().toISOString()
+            };
+            
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'webnimate1.json';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showNotification('File saved as JSON');
+        }
+        
+        function exportAsSVG() {
+            const svgData = new XMLSerializer().serializeToString(canvas);
+            const blob = new Blob([svgData], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'webnimate1.svg';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showNotification('Exported as SVG');
+        }
+        
+        function exportAsRAWR() {
+            // This is a simplified export format for demonstration
+            const elements = [];
+            
+            canvas.childNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const element = {
+                        type: node.tagName,
+                        attributes: {}
+                    };
+                    
+                    for (let i = 0; i < node.attributes.length; i++) {
+                        const attr = node.attributes[i];
+                        element.attributes[attr.name] = attr.value;
+                    }
+                    
+                    if (node.tagName === 'text') {
+                        element.textContent = node.textContent;
+                    }
+                    
+                    elements.push(element);
+                }
+            });
+            
+            const rawr = {
+                version: '1.0',
+                elements: elements,
+                timestamp: new Date().toISOString()
+            };
+            
+            const json = JSON.stringify(rawr, null, 2);
+            const blob = new Blob([json], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'webnimate1.rawr';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showNotification('Exported as RAWR');
+        }
+        
+        function importSVG(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(event.target.result, 'image/svg+xml');
+                    const svgElements = doc.querySelectorAll('svg > *');
+                    
+                    svgElements.forEach(element => {
+                        canvas.appendChild(document.importNode(element, true));
+                    });
+                    
+                    saveHistory();
+                    updateObjectsList();
+                    showNotification('SVG imported successfully');
+                } catch (error) {
+                    showNotification('Error importing SVG: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function importInkscapeSVG(e) {
+            // For simplicity, we'll treat Inkscape SVG the same as regular SVG
+            importSVG(e);
+        }
+        
+        function importRAWR(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    
+                    data.elements.forEach(elementData => {
+                        const element = document.createElementNS('http://www.w3.org/2000/svg', elementData.type);
+                        
+                        for (const attr in elementData.attributes) {
+                            element.setAttribute(attr, elementData.attributes[attr]);
+                        }
+                        
+                        if (elementData.textContent) {
+                            element.textContent = elementData.textContent;
+                        }
+                        
+                        canvas.appendChild(element);
+                    });
+                    
+                    saveHistory();
+                    updateObjectsList();
+                    showNotification('RAWR imported successfully');
+                } catch (error) {
+                    showNotification('Error importing RAWR: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function importImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+                    img.setAttribute('href', event.target.result);
+                    img.setAttribute('x', 100);
+                    img.setAttribute('y', 100);
+                    img.setAttribute('width', 200);
+                    img.setAttribute('height', 200);
+                    
+                    canvas.appendChild(img);
+                    saveHistory();
+                    updateObjectsList();
+                    showNotification('Image imported successfully');
+                } catch (error) {
+                    showNotification('Error importing image: ' + error.message);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Update objects list
+        function updateObjectsList() {
+            objectsList.innerHTML = '';
+            
+            // Get all elements except the selection box
+            const elements = Array.from(canvas.querySelectorAll('*')).filter(element => {
+                return element.id !== 'svg-selection-box';
+            });
+            
+            if (elements.length === 0) {
+                objectsList.innerHTML = '<p>No objects in the current frame.</p>';
+                return;
+            }
+            
+            elements.forEach((element, index) => {
+                const item = document.createElement('div');
+                item.className = 'object-item';
+                
+                // Highlight if this element is currently selected
+                if (element === selectedElement) {
+                    item.classList.add('selected');
+                }
+                
+                const type = element.tagName.toLowerCase();
+                
+                // Create the object name
+                const objectName = document.createElement('span');
+                objectName.textContent = `${type} ${index + 1}`;
+                objectName.style.flex = '1';
+                
+                // Create delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.textContent = 'Delete';
+                
+                // Add event listeners
+                objectName.addEventListener('click', () => {
+                    selectElement(element);
+                });
+                
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering the item click event
+                    deleteElement(element);
+                });
+                
+                item.appendChild(objectName);
+                item.appendChild(deleteBtn);
+                objectsList.appendChild(item);
+            });
+        }
+        
+        // Delete a specific element
+        function deleteElement(element) {
+            // If we're deleting the selected element, clear the selection first
+            if (element === selectedElement) {
+                const selectionRect = document.getElementById('svg-selection-box');
+                if (selectionRect) {
+                    canvas.removeChild(selectionRect);
+                }
+                selectedElement = null;
+            }
+            
+            // Remove the element if it's a child of the canvas
+            if (element.parentNode === canvas) {
+                canvas.removeChild(element);
+            }
+            
+            saveHistory();
+            updateObjectsList();
+            showNotification('Element deleted');
+        }
+        
+        // Keyboard shortcuts
+        function handleKeyDown(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'z':
+                        e.preventDefault();
+                        undo();
+                        break;
+                    case 'y':
+                        e.preventDefault();
+                        redo();
+                        break;
+                    case 'c':
+                        e.preventDefault();
+                        copy();
+                        break;
+                    case 'v':
+                        e.preventDefault();
+                        paste();
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        duplicate();
+                        break;
+                }
+            } else if (e.key === 'Delete') {
+                e.preventDefault();
+                deleteSelectedElement();
+            } else if (e.key === '+') {
+                e.preventDefault();
+                zoom(1.2); // Zoom in
+            } else if (e.key === '-') {
+                e.preventDefault();
+                zoom(0.8); // Zoom out
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                resetZoom(); // Reset and center the canvas
+            }
+        }
+        
+        // Notification function
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Initialize the editor when the page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+</body></html>
