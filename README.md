@@ -5,5 +5,8 @@ Features:
 - No Dependencies
 
 TODO:
-- Brush tool
+- Multi-line
+- Brush
+- Fill
+- Onion Skin
 - Animation
