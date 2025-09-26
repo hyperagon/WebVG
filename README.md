@@ -3,9 +3,10 @@ An [SVG](https://en.wikipedia.org/wiki/SVG) editor inspired by [Glaxnimate](http
 Features:
 - Online
 - No Dependencies
+- --Multi-line-- Path
 
 TODO:
-- Multi-line
+
 - Brush
 - Fill
 - Onion Skin
