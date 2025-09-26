@@ -3,11 +3,18 @@ An [SVG](https://en.wikipedia.org/wiki/SVG) editor inspired by [Glaxnimate](http
 Features:
 - Online
 - No Dependencies
-- ~~Multi-line~ Path
+- Shapes (Rectangle, Ellipse, Text)
+- Line
+- Multi-line (Ctrl)
+- Path (Free-hand Line)
+- Multi-path (Ctrl)
+- Re-order Objects
+- Groups
 
 TODO:
-
 - Brush
+- Multi-brush (Ctrl)
+- Edit Line/Path/Brush Edges
 - Fill
 - Onion Skin
 - Animation
