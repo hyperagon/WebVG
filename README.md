@@ -3,7 +3,7 @@ An [SVG](https://en.wikipedia.org/wiki/SVG) editor inspired by [Glaxnimate](http
 Features:
 - Online
 - No Dependencies
-- --Multi-line-- Path
+- ~~Multi-line~ Path
 
 TODO:
 
