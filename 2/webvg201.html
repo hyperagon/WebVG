@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebVG</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .menu-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            z-index: 100;
+            display: flex;
+        }
+        
+        .menu {
+            padding: 5px 10px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .menu:hover {
+            background: #e0e0e0;
+        }
+        
+        .menu-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+            min-width: 150px;
+            z-index: 101;
+        }
+        
+        .menu:hover .menu-dropdown {
+            display: block;
+        }
+        
+        .menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        
+        .menu-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .submenu {
+            position: relative;
+        }
+        
+        .submenu-content {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+            min-width: 120px;
+        }
+        
+        .submenu:hover .submenu-content {
+            display: block;
+        }
+        
+        /* Left toolbar styles */
+        .left-toolbar {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            width: 50px;
+            bottom: 0;
+            background: #e8e8e8;
+            border-right: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 10px;
+            z-index: 50;
+        }
+        
+        .toolbar-button {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 5px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.2s;
+        }
+        
+        .toolbar-button:hover {
+            background: #d0d0d0;
+        }
+        
+        .toolbar-button.active {
+            background: #c0c0c0;
+            border-color: #999;
+        }
+        
+        .toolbar-separator {
+            width: 30px;
+            height: 1px;
+            background: #ccc;
+            margin: 10px 0;
+        }
+        
+        /* Right pane styles */
+        .right-pane {
+            position: absolute;
+            top: 30px;
+            right: 0;
+            width: 250px;
+            bottom: 0;
+            background: #f5f5f5;
+            border-left: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+        
+        .pane-tabs {
+            display: flex;
+            border-bottom: 1px solid #ccc;
+            background: #e8e8e8;
+        }
+        
+        .pane-tab {
+            flex: 1;
+            padding: 8px 0;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .pane-tab:hover {
+            background: #ddd;
+        }
+        
+        .pane-tab.active {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+        }
+        
+        .pane-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .tab-panel {
+            display: none;
+        }
+        
+        .tab-panel.active {
+            display: block;
+        }
+        
+        .tool-section {
+            margin-bottom: 15px;
+        }
+        
+        .tool-section-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        
+        .tool-option {
+            margin-bottom: 10px;
+        }
+        
+        .tool-option-label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 4px;
+            color: #666;
+        }
+        
+        .tool-option-input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .tool-option-select {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .tool-option-color {
+            width: 100%;
+            height: 30px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .tool-option-range {
+            width: 100%;
+        }
+        
+        .element-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .element-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .element-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .element-item.selected {
+            background: #e0f0e0;
+            border-color: #4CAF50;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 20px 0;
+        }
+        
+        #main-canvas {
+            position: absolute;
+            top: 30px;
+            left: 50px;
+            cursor: crosshair;
+            background-color: #d0d0d0; /* Set the background color here */
+        }
+        
+        #main-canvas:active {
+            cursor: grabbing;
+        }
+        
+        #main-canvas.locked {
+            cursor: default;
+        }
+        
+        /* Modal dialog styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 400px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        .modal-buttons {
+            text-align: right;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons button {
+            padding: 8px 15px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #45a049';
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group input {
+            margin-right: 10px;
+        }
+        
+        /* Toggle styles */
+        .toggle-item {
+            display: inline-flex;
+            align-items: center;
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        
+        .toggle-indicator {
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="menu-bar">
+        <div class="menu">
+            File
+            <div class="menu-dropdown">
+                <div class="menu-item submenu">
+                    Export ▶
+                    <div class="submenu-content">
+                        <div class="menu-item" id="export-png">PNG</div>
+                        <div class="menu-item" id="export-jpeg">JPEG</div>
+                        <div class="menu-item" id="export-webp">WebP</div>
+                        <div class="menu-item" id="export-bmp">BMP</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="menu">
+            View
+            <div class="menu-dropdown">
+                <div class="menu-item" id="zoom-in">Zoom In</div>
+                <div class="menu-item" id="zoom-out">Zoom Out</div>
+                <div class="menu-item" id="zoom-fit">
+                    Fit to Screen
+                    <span class="toggle-item" id="toggle-lock">
+                        <span class="toggle-indicator">🔓</span>
+                    </span>
+                </div>
+                <div class="menu-item" id="zoom-100">100%</div>
+                <div class="menu-item" id="recenter">Recenter</div>
+            </div>
+        </div>
+        <div class="menu">
+            Configure
+            <div class="menu-dropdown">
+                <div class="menu-item" id="document-settings">Document...</div>
+                <div class="menu-item" id="grid-settings">
+                    Grid
+                    <span class="toggle-item" id="toggle-grid">
+                        <span class="toggle-indicator">❎</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Left Toolbar -->
+    <div class="left-toolbar">
+        <div class="toolbar-button" id="select-tool" title="Select Tool">↖</div>
+        <div class="toolbar-button" id="draw-tool" title="Draw Tool">✏️</div>
+        <div class="toolbar-button" id="text-tool" title="Text Tool">T</div>
+        <div class="toolbar-button" id="shape-tool" title="Shape Tool">⬜</div>
+        <div class="toolbar-separator"></div>
+        <div class="toolbar-button" id="fill-tool" title="Fill Tool">🪣</div>
+        <div class="toolbar-button" id="eraser-tool" title="Eraser Tool">🧽</div>
+    </div>
+    
+    <!-- Right Pane -->
+    <div class="right-pane">
+        <div class="pane-tabs">
+            <div class="pane-tab active" data-tab="options">Options</div>
+            <div class="pane-tab" data-tab="elements">Elements</div>
+        </div>
+        <div class="pane-content">
+            <!-- Options Tab -->
+            <div id="options-tab" class="tab-panel active">
+                <div class="empty-state">
+                    Select a tool to see its options
+                </div>
+                
+                <!-- Select Tool Options -->
+                <div id="select-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Selection Options</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Selection Mode</label>
+                            <select class="tool-option-select">
+                                <option>Rectangle</option>
+                                <option>Ellipse</option>
+                                <option>Lasso</option>
+                            </select>
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Feather</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Draw Tool Options -->
+                <div id="draw-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Brush Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Brush Size</label>
+                            <input type="range" class="tool-option-range" min="1" max="100" value="5" id="brush-size">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Brush Opacity</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="100" id="brush-opacity">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Brush Color</label>
+                            <input type="color" class="tool-option-color" value="#000000" id="brush-color">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Text Tool Options -->
+                <div id="text-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Text Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Font Family</label>
+                            <select class="tool-option-select" id="font-family">
+                                <option>Arial</option>
+                                <option>Times New Roman</option>
+                                <option>Courier New</option>
+                                <option>Verdana</option>
+                            </select>
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Font Size</label>
+                            <input type="number" class="tool-option-input" min="8" max="72" value="16" id="font-size">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Text Color</label>
+                            <input type="color" class="tool-option-color" value="#000000" id="text-color">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Shape Tool Options -->
+                <div id="shape-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Shape Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Shape Type</label>
+                            <select class="tool-option-select" id="shape-type">
+                                <option>Rectangle</option>
+                                <option>Circle</option>
+                                <option>Triangle</option>
+                                <option>Line</option>
+                            </select>
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Fill Color</label>
+                            <input type="color" class="tool-option-color" value="#ff0000" id="fill-color">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Stroke Color</label>
+                            <input type="color" class="tool-option-color" value="#000000" id="stroke-color">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Stroke Width</label>
+                            <input type="range" class="tool-option-range" min="1" max="20" value="2" id="stroke-width">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Fill Tool Options -->
+                <div id="fill-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Fill Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Fill Color</label>
+                            <input type="color" class="tool-option-color" value="#00ff00" id="fill-color">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Tolerance</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="32" id="tolerance">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Eraser Tool Options -->
+                <div id="eraser-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Eraser Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Eraser Size</label>
+                            <input type="range" class="tool-option-range" min="1" max="100" value="20" id="eraser-size">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Eraser Opacity</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="100" id="eraser-opacity">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Elements Tab -->
+            <div id="elements-tab" class="tab-panel">
+                <div class="empty-state">
+                    No elements yet. Start drawing to create elements.
+                </div>
+                <div class="tool-section">
+                    <div class="tool-section-title">Document Elements</div>
+                    <ul class="element-list" id="document-elements">
+                        <!-- Elements will be added here as they are created -->
+                    </ul>
+                </div>
+                <div class="tool-section">
+                    <div class="tool-section-title">Layers</div>
+                    <ul class="element-list" id="layers-list">
+                        <!-- Layers will be added here as they are created -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <canvas id="main-canvas"></canvas>
+    
+    <!-- Document Settings Modal -->
+    <div id="document-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Document Settings</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="export-width">Export Width</label>
+                    <input type="number" id="export-width" min="100" max="5000" value="1280">
+                </div>
+                <div class="form-group">
+                    <label for="export-height">Export Height</label>
+                    <input type="number" id="export-height" min="100" max="5000" value="720">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="export-bg-color">Export Background</label>
+                    <input type="color" id="export-bg-color" value="#ffffff">
+                </div>
+                <div class="form-group">
+                    <label for="surrounding-bg-color">Surrounding Background</label>
+                    <input type="color" id="surrounding-bg-color" value="#d0d0d0">
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="transparent-bg" checked>
+                <label for="transparent-bg">Transparent Background in Export</label>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="cancel-settings">Cancel</button>
+                <button class="btn-primary" id="save-settings">OK</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Grid Settings Modal -->
+    <div id="grid-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Grid Settings</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="grid-size">Grid Size</label>
+                    <input type="number" id="grid-size" min="10" max="200" value="50">
+                </div>
+                <div class="form-group">
+                    <label for="grid-color">Grid Color</label>
+                    <input type="color" id="grid-color" value="#dddddd">
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="cancel-grid-settings">Cancel</button>
+                <button class="btn-primary" id="save-grid-settings">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get the canvas and context
+        const mainCanvas = document.getElementById('main-canvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        
+        // Export menu items
+        const exportPNG = document.getElementById('export-png');
+        const exportJPEG = document.getElementById('export-jpeg');
+        const exportWebP = document.getElementById('export-webp');
+        const exportBMP = document.getElementById('export-bmp');
+        const zoomInItem = document.getElementById('zoom-in');
+        const zoomOutItem = document.getElementById('zoom-out');
+        const zoomFitItem = document.getElementById('zoom-fit');
+        const zoom100Item = document.getElementById('zoom-100');
+        const recenterItem = document.getElementById('recenter');
+        const documentSettings = document.getElementById('document-settings');
+        const gridSettings = document.getElementById('grid-settings');
+        const toggleGrid = document.getElementById('toggle-grid');
+        const toggleLock = document.getElementById('toggle-lock');
+        
+        // Toolbar buttons
+        const selectTool = document.getElementById('select-tool');
+        const drawTool = document.getElementById('draw-tool');
+        const textTool = document.getElementById('text-tool');
+        const shapeTool = document.getElementById('shape-tool');
+        const fillTool = document.getElementById('fill-tool');
+        const eraserTool = document.getElementById('eraser-tool');
+        
+        // Right pane tabs
+        const paneTabs = document.querySelectorAll('.pane-tab');
+        const tabPanels = document.querySelectorAll('.tab-panel');
+        const toolOptionsPanels = document.querySelectorAll('.tool-options-panel');
+        const emptyState = document.querySelector('.empty-state');
+        
+        // Modal elements
+        const modal = document.getElementById('document-modal');
+        const gridModal = document.getElementById('grid-modal');
+        const exportWidthInput = document.getElementById('export-width');
+        const exportHeightInput = document.getElementById('export-height');
+        const exportBgColorInput = document.getElementById('export-bg-color');
+        const surroundingBgColorInput = document.getElementById('surrounding-bg-color');
+        const transparentBgInput = document.getElementById('transparent-bg');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        const cancelSettingsBtn = document.getElementById('cancel-settings');
+        
+        // Grid modal elements
+        const gridSizeInput = document.getElementById('grid-size');
+        const gridColorInput = document.getElementById('grid-color');
+        const saveGridSettingsBtn = document.getElementById('save-grid-settings');
+        const cancelGridSettingsBtn = document.getElementById('cancel-grid-settings');
+        
+        // Tool option elements
+        const brushSizeInput = document.getElementById('brush-size');
+        const brushOpacityInput = document.getElementById('brush-opacity');
+        const brushColorInput = document.getElementById('brush-color');
+        const fontFamilySelect = document.getElementById('font-family');
+        const fontSizeInput = document.getElementById('font-size');
+        const textColorInput = document.getElementById('text-color');
+        const shapeTypeSelect = document.getElementById('shape-type');
+        const fillColorInput = document.getElementById('fill-color');
+        const strokeColorInput = document.getElementById('stroke-color');
+        const strokeWidthInput = document.getElementById('stroke-width');
+        const eraserSizeInput = document.getElementById('eraser-size');
+        const eraserOpacityInput = document.getElementById('eraser-opacity');
+        
+        // Document settings
+        let exportWidth = 1280;
+        let exportHeight = 720;
+        let exportBgColor = '#ffffff';
+        let surroundingBgColor = '#d0d0d0';
+        let showGrid = true;
+        let transparentBg = true;
+        let viewLocked = false;
+        
+        // Grid settings
+        let gridSize = 50;
+        let gridColor = '#dddddd';
+        
+        // Canvas state
+        let viewX = 0;
+        let viewY = 0;
+        let zoom = 1.0;
+        const minZoom = 0.1;
+        const maxZoom = 5.0;
+        
+        // Panning state
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panViewStartX = 0;
+        let panViewStartY = 0;
+        
+        // Mouse position
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        // Current tool
+        let currentTool = 'select';
+        
+        // Drawing state
+        let isDrawing = false;
+        let drawStartX = 0;
+        let drawStartY = 0;
+        let elements = [];
+        
+        // Selection state
+        let isSelecting = false;
+        let selectionStartX = 0;
+        let selectionStartY = 0;
+        let selectionEndX = 0;
+        let selectionEndY = 0;
+        let selectedElements = [];
+        
+        // Modular Toggle System
+        class Toggle {
+            constructor(elementId, initialState, onChar = '●', offChar = '○') {
+                this.element = document.getElementById(elementId);
+                this.indicator = this.element.querySelector('.toggle-indicator');
+                this.state = initialState;
+                this.onChar = onChar;
+                this.offChar = offChar;
+                this.callbacks = [];
+                
+                // Set initial state
+                this.updateIndicator();
+                
+                // Add click event listener
+                this.element.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering parent menu item
+                    this.toggle();
+                });
+            }
+            
+            toggle() {
+                this.state = !this.state;
+                this.updateIndicator();
+                
+                // Call all callbacks
+                this.callbacks.forEach(callback => callback(this.state));
+            }
+            
+            updateIndicator() {
+                this.indicator.textContent = this.state ? this.onChar : this.offChar;
+            }
+            
+            setState(newState) {
+                this.state = newState;
+                this.updateIndicator();
+            }
+            
+            addCallback(callback) {
+                this.callbacks.push(callback);
+            }
+        }
+        
+        // Create the grid toggle with checkmark indicators
+        const gridToggle = new Toggle('toggle-grid', showGrid, '✅', '❎');
+        
+        // Add callback to update grid visibility when toggle changes
+        gridToggle.addCallback((state) => {
+            showGrid = state;
+            redrawCanvas();
+        });
+        
+        // Create the lock toggle with lock/unlock icons
+        const lockToggle = new Toggle('toggle-lock', viewLocked, '🔒', '🔓');
+        
+        // Add callback to handle lock toggle
+        lockToggle.addCallback((state) => {
+            viewLocked = state;
+            if (viewLocked) {
+                // Fit to screen when locking
+                zoomFit();
+                // Change cursor to default
+                mainCanvas.classList.add('locked');
+            } else {
+                // Restore grab cursor
+                mainCanvas.classList.remove('locked');
+            }
+        });
+        
+        // Set canvas to full window size (minus menu bar and toolbars)
+        function resizeCanvas() {
+            mainCanvas.width = window.innerWidth - 300; // Subtract left (50px) and right pane (250px) widths
+            mainCanvas.height = window.innerHeight - 30; // Subtract menu bar height
+            
+            // Set canvas background color
+            mainCanvas.style.backgroundColor = surroundingBgColor;
+            
+            // If view is locked, refit to screen
+            if (viewLocked) {
+                zoomFit();
+            } else {
+                redrawCanvas();
+            }
+        }
+        
+        // Draw everything
+        function redrawCanvas() {
+            // Clear canvas
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            // Draw gray background (entire canvas)
+            mainCtx.fillStyle = surroundingBgColor;
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            // Save context state
+            mainCtx.save();
+            
+            // Apply view transformations
+            mainCtx.translate(viewX, viewY);
+            mainCtx.scale(zoom, zoom);
+            
+            // Draw white document area (export area)
+            mainCtx.fillStyle = exportBgColor;
+            mainCtx.fillRect(0, 0, exportWidth, exportHeight);
+            
+            // Draw content on document area
+            drawContent();
+            
+            // Restore context state
+            mainCtx.restore();
+        }
+        
+        // Draw content on the document
+        function drawContent() {
+            // Draw grid if enabled
+            if (showGrid) {
+                mainCtx.strokeStyle = gridColor;
+                mainCtx.lineWidth = 1;
+                
+                for (let x = 0; x <= exportWidth; x += gridSize) {
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(x, 0);
+                    mainCtx.lineTo(x, exportHeight);
+                    mainCtx.stroke();
+                }
+                
+                for (let y = 0; y <= exportHeight; y += gridSize) {
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(0, y);
+                    mainCtx.lineTo(exportWidth, y);
+                    mainCtx.stroke();
+                }
+            }
+            
+            // Draw all elements
+            elements.forEach((element, index) => {
+                mainCtx.save();
+                
+                // Highlight selected elements
+                if (selectedElements.includes(index)) {
+                    mainCtx.shadowColor = '#4CAF50';
+                    mainCtx.shadowBlur = 10;
+                }
+                
+                if (element.type === 'path') {
+                    mainCtx.strokeStyle = element.color;
+                    mainCtx.lineWidth = element.size;
+                    mainCtx.lineCap = 'round';
+                    mainCtx.lineJoin = 'round';
+                    mainCtx.globalAlpha = element.opacity;
+                    
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(element.points[0].x, element.points[0].y);
+                    
+                    for (let i = 1; i < element.points.length; i++) {
+                        mainCtx.lineTo(element.points[i].x, element.points[i].y);
+                    }
+                    
+                    mainCtx.stroke();
+                } else if (element.type === 'rectangle') {
+                    mainCtx.fillStyle = element.fillColor;
+                    mainCtx.strokeStyle = element.strokeColor;
+                    mainCtx.lineWidth = element.strokeWidth;
+                    mainCtx.globalAlpha = element.opacity;
+                    
+                    const x = Math.min(element.startX, element.endX);
+                    const y = Math.min(element.startY, element.endY);
+                    const width = Math.abs(element.endX - element.startX);
+                    const height = Math.abs(element.endY - element.startY);
+                    
+                    mainCtx.fillRect(x, y, width, height);
+                    mainCtx.strokeRect(x, y, width, height);
+                } else if (element.type === 'circle') {
+                    mainCtx.fillStyle = element.fillColor;
+                    mainCtx.strokeStyle = element.strokeColor;
+                    mainCtx.lineWidth = element.strokeWidth;
+                    mainCtx.globalAlpha = element.opacity;
+                    
+                    const centerX = (element.startX + element.endX) / 2;
+                    const centerY = (element.startY + element.endY) / 2;
+                    const radiusX = Math.abs(element.endX - element.startX) / 2;
+                    const radiusY = Math.abs(element.endY - element.startY) / 2;
+                    
+                    mainCtx.beginPath();
+                    mainCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                    mainCtx.fill();
+                    mainCtx.stroke();
+                } else if (element.type === 'text') {
+                    mainCtx.fillStyle = element.color;
+                    mainCtx.font = `${element.fontSize}px ${element.fontFamily}`;
+                    mainCtx.globalAlpha = element.opacity;
+                    mainCtx.fillText(element.text, element.x, element.y);
+                }
+                
+                mainCtx.restore();
+            });
+            
+            // Draw selection rectangle if selecting
+            if (isSelecting) {
+                mainCtx.save();
+                mainCtx.strokeStyle = '#4CAF50';
+                mainCtx.lineWidth = 1;
+                mainCtx.setLineDash([5, 5]);
+                
+                const x = Math.min(selectionStartX, selectionEndX);
+                const y = Math.min(selectionStartY, selectionEndY);
+                const width = Math.abs(selectionEndX - selectionStartX);
+                const height = Math.abs(selectionEndY - selectionStartY);
+                
+                mainCtx.strokeRect(x, y, width, height);
+                mainCtx.restore();
+            }
+        }
+        
+        // Export functionality
+        function exportCanvas(format) {
+            // Create a temporary canvas for export
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = exportWidth;
+            tempCanvas.height = exportHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Fill background
+            if (format === 'jpeg' || !transparentBg) {
+                tempCtx.fillStyle = exportBgColor;
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            }
+            
+            // Draw content
+            drawContentForExport(tempCtx);
+            
+            // Set up export parameters
+            let mimeType, filename, quality;
+            
+            switch(format) {
+                case 'png':
+                    mimeType = 'image/png';
+                    filename = 'export.png';
+                    quality = undefined;
+                    break;
+                case 'jpeg':
+                    mimeType = 'image/jpeg';
+                    filename = 'export.jpg';
+                    quality = 0.9;
+                    break;
+                case 'webp':
+                    mimeType = 'image/webp';
+                    filename = 'export.webp';
+                    quality = 0.9;
+                    break;
+                case 'bmp':
+                    mimeType = 'image/bmp';
+                    filename = 'export.bmp';
+                    quality = undefined;
+                    break;
+            }
+            
+            // Create a download link
+            tempCanvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+            }, mimeType, quality);
+        }
+        
+        // Draw content for export (without grid)
+        function drawContentForExport(ctx) {
+            // Draw all elements
+            elements.forEach(element => {
+                ctx.save();
+                
+                if (element.type === 'path') {
+                    ctx.strokeStyle = element.color;
+                    ctx.lineWidth = element.size;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.globalAlpha = element.opacity;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(element.points[0].x, element.points[0].y);
+                    
+                    for (let i = 1; i < element.points.length; i++) {
+                        ctx.lineTo(element.points[i].x, element.points[i].y);
+                    }
+                    
+                    ctx.stroke();
+                } else if (element.type === 'rectangle') {
+                    ctx.fillStyle = element.fillColor;
+                    ctx.strokeStyle = element.strokeColor;
+                    ctx.lineWidth = element.strokeWidth;
+                    ctx.globalAlpha = element.opacity;
+                    
+                    const x = Math.min(element.startX, element.endX);
+                    const y = Math.min(element.startY, element.endY);
+                    const width = Math.abs(element.endX - element.startX);
+                    const height = Math.abs(element.endY - element.startY);
+                    
+                    ctx.fillRect(x, y, width, height);
+                    ctx.strokeRect(x, y, width, height);
+                } else if (element.type === 'circle') {
+                    ctx.fillStyle = element.fillColor;
+                    ctx.strokeStyle = element.strokeColor;
+                    ctx.lineWidth = element.strokeWidth;
+                    ctx.globalAlpha = element.opacity;
+                    
+                    const centerX = (element.startX + element.endX) / 2;
+                    const centerY = (element.startY + element.endY) / 2;
+                    const radiusX = Math.abs(element.endX - element.startX) / 2;
+                    const radiusY = Math.abs(element.endY - element.startY) / 2;
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (element.type === 'text') {
+                    ctx.fillStyle = element.color;
+                    ctx.font = `${element.fontSize}px ${element.fontFamily}`;
+                    ctx.globalAlpha = element.opacity;
+                    ctx.fillText(element.text, element.x, element.y);
+                }
+                
+                ctx.restore();
+            });
+        }
+        
+        // Get mouse position relative to canvas
+        function getMousePos(e) {
+            const rect = mainCanvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+        
+        // Convert canvas coordinates to document coordinates
+        function canvasToDocument(canvasX, canvasY) {
+            return {
+                x: (canvasX - viewX) / zoom,
+                y: (canvasY - viewY) / zoom
+            };
+        }
+        
+        // Zoom functions
+        function zoomIn(centerOnCursor = false) {
+            if (viewLocked) return;
+            
+            if (zoom < maxZoom) {
+                const newZoom = Math.min(zoom * 1.2, maxZoom);
+                
+                if (centerOnCursor) {
+                    // Calculate mouse position in document coordinates
+                    const docX = (mouseX - viewX) / zoom;
+                    const docY = (mouseY - viewY) / zoom;
+                    
+                    // Adjust view position to zoom towards mouse position
+                    viewX = mouseX - docX * newZoom;
+                    viewY = mouseY - docY * newZoom;
+                } else {
+                    // Center on canvas
+                    viewX = (mainCanvas.width - exportWidth * newZoom) / 2;
+                    viewY = (mainCanvas.height - exportHeight * newZoom) / 2;
+                }
+                
+                zoom = newZoom;
+                redrawCanvas();
+            }
+        }
+        
+        function zoomOut(centerOnCursor = false) {
+            if (viewLocked) return;
+            
+            if (zoom > minZoom) {
+                const newZoom = Math.max(zoom / 1.2, minZoom);
+                
+                if (centerOnCursor) {
+                    // Calculate mouse position in document coordinates
+                    const docX = (mouseX - viewX) / zoom;
+                    const docY = (mouseY - viewY) / zoom;
+                    
+                    // Adjust view position to zoom towards mouse position
+                    viewX = mouseX - docX * newZoom;
+                    viewY = mouseY - docY * newZoom;
+                } else {
+                    // Center on canvas
+                    viewX = (mainCanvas.width - exportWidth * newZoom) / 2;
+                    viewY = (mainCanvas.height - exportHeight * newZoom) / 2;
+                }
+                
+                zoom = newZoom;
+                redrawCanvas();
+            }
+        }
+        
+        function zoomFit() {
+            // Calculate zoom to fit the document in the canvas
+            const zoomX = mainCanvas.width / exportWidth;
+            const zoomY = mainCanvas.height / exportHeight;
+            zoom = Math.min(zoomX, zoomY); // Use 100% of available space
+            
+            // Center the document
+            viewX = (mainCanvas.width - exportWidth * zoom) / 2;
+            viewY = (mainCanvas.height - exportHeight * zoom) / 2;
+            
+            redrawCanvas();
+        }
+        
+        function zoom100() {
+            if (viewLocked) return;
+            
+            zoom = 1.0;
+            viewX = (mainCanvas.width - exportWidth) / 2;
+            viewY = (mainCanvas.height - exportHeight) / 2;
+            redrawCanvas();
+        }
+        
+        function recenter() {
+            if (viewLocked) return;
+            
+            viewX = (mainCanvas.width - exportWidth * zoom) / 2;
+            viewY = (mainCanvas.height - exportHeight * zoom) / 2;
+            redrawCanvas();
+        }
+        
+        // Tool selection
+        function selectToolHandler(toolId) {
+            // Remove active class from all tools
+            document.querySelectorAll('.toolbar-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // Add active class to selected tool
+            document.getElementById(toolId).classList.add('active');
+            
+            // Update current tool
+            currentTool = toolId.replace('-tool', '');
+            
+            // Update options panel to show the correct tool options
+            updateToolOptions(currentTool);
+            
+            // Update cursor based on tool
+            updateCursor();
+        }
+        
+        // Update cursor based on current tool
+        function updateCursor() {
+            if (viewLocked) {
+                mainCanvas.style.cursor = 'default';
+                return;
+            }
+            
+            switch (currentTool) {
+                case 'select':
+                case 'text':
+                    mainCanvas.style.cursor = 'text';
+                    break;
+                case 'draw':
+                case 'eraser':
+                    mainCanvas.style.cursor = 'crosshair';
+                    break;
+                case 'shape':
+                case 'fill':
+                    mainCanvas.style.cursor = 'crosshair';
+                    break;
+                default:
+                    mainCanvas.style.cursor = 'grab';
+            }
+        }
+        
+        // Update tool options panel based on selected tool
+        function updateToolOptions(tool) {
+            // Hide all tool options panels
+            toolOptionsPanels.forEach(panel => {
+                panel.style.display = 'none';
+            });
+            
+            // Hide the empty state message
+            emptyState.style.display = 'none';
+            
+            // Show the panel for the selected tool
+            const toolPanel = document.getElementById(`${tool}-options`);
+            if (toolPanel) {
+                toolPanel.style.display = 'block';
+            } else {
+                // If no panel exists for this tool, show the empty state
+                emptyState.style.display = 'block';
+            }
+        }
+        
+        // Add event listeners for export menu items
+        exportPNG.addEventListener('click', () => exportCanvas('png'));
+        exportJPEG.addEventListener('click', () => exportCanvas('jpeg'));
+        exportWebP.addEventListener('click', () => exportCanvas('webp'));
+        exportBMP.addEventListener('click', () => exportCanvas('bmp'));
+        
+        // Add event listeners for zoom menu items
+        zoomInItem.addEventListener('click', () => zoomIn(false));
+        zoomOutItem.addEventListener('click', () => zoomOut(false));
+        zoomFitItem.addEventListener('click', (e) => {
+            // Only trigger if not clicking on the toggle
+            if (e.target.id !== 'toggle-lock' && !e.target.closest('#toggle-lock')) {
+                if (!viewLocked) zoomFit();
+            }
+        });
+        zoom100Item.addEventListener('click', zoom100);
+        recenterItem.addEventListener('click', recenter);
+        
+        // Document settings modal
+        documentSettings.addEventListener('click', () => {
+            // Set current values in the form
+            exportWidthInput.value = exportWidth;
+            exportHeightInput.value = exportHeight;
+            exportBgColorInput.value = exportBgColor;
+            surroundingBgColorInput.value = surroundingBgColor;
+            transparentBgInput.checked = transparentBg;
+            
+            // Show the modal
+            modal.style.display = 'block';
+        });
+        
+        saveSettingsBtn.addEventListener('click', () => {
+            // Save the new settings
+            exportWidth = parseInt(exportWidthInput.value);
+            exportHeight = parseInt(exportHeightInput.value);
+            exportBgColor = exportBgColorInput.value;
+            surroundingBgColor = surroundingBgColorInput.value;
+            transparentBg = transparentBgInput.checked;
+            
+            // Update canvas background color
+            mainCanvas.style.backgroundColor = surroundingBgColor;
+            
+            // If view is locked, refit to screen with new dimensions
+            if (viewLocked) {
+                zoomFit();
+            } else {
+                // Recenter the document
+                recenter();
+            }
+            
+            // Hide the modal
+            modal.style.display = 'none';
+        });
+        
+        cancelSettingsBtn.addEventListener('click', () => {
+            // Hide the modal without saving
+            modal.style.display = 'none';
+        });
+        
+        // Grid settings modal
+        gridSettings.addEventListener('click', (e) => {
+            // Only trigger if not clicking on the toggle
+            if (e.target.id !== 'toggle-grid' && !e.target.closest('#toggle-grid')) {
+                // Set current values in the form
+                gridSizeInput.value = gridSize;
+                gridColorInput.value = gridColor;
+                
+                // Show the modal
+                gridModal.style.display = 'block';
+            }
+        });
+        
+        saveGridSettingsBtn.addEventListener('click', () => {
+            // Save the new settings
+            gridSize = parseInt(gridSizeInput.value);
+            gridColor = gridColorInput.value;
+            
+            // Redraw canvas
+            redrawCanvas();
+            
+            // Hide the modal
+            gridModal.style.display = 'none';
+        });
+        
+        cancelGridSettingsBtn.addEventListener('click', () => {
+            // Hide the modal without saving
+            gridModal.style.display = 'none';
+        });
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+            if (e.target === gridModal) {
+                gridModal.style.display = 'none';
+            }
+        });
+        
+        // Toolbar button event listeners
+        selectTool.addEventListener('click', () => selectToolHandler('select-tool'));
+        drawTool.addEventListener('click', () => selectToolHandler('draw-tool'));
+        textTool.addEventListener('click', () => selectToolHandler('text-tool'));
+        shapeTool.addEventListener('click', () => selectToolHandler('shape-tool'));
+        fillTool.addEventListener('click', () => selectToolHandler('fill-tool'));
+        eraserTool.addEventListener('click', () => selectToolHandler('eraser-tool'));
+        
+        // Right pane tab event listeners
+        paneTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                paneTabs.forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Hide all tab panels
+                tabPanels.forEach(panel => {
+                    panel.classList.remove('active');
+                });
+                
+                // Show the corresponding tab panel
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+        
+        // Prevent context menu on right click
+        mainCanvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+        
+        // Mouse down event - start drawing or panning
+        mainCanvas.addEventListener('mousedown', (e) => {
+            if (viewLocked) return;
+            
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            if (e.button === 2) { // Right mouse button - panning
+                isPanning = true;
+                panStartX = pos.x;
+                panStartY = pos.y;
+                panViewStartX = viewX;
+                panViewStartY = viewY;
+                mainCanvas.style.cursor = 'grabbing';
+            } else if (e.button === 0) { // Left mouse button - drawing or selecting
+                const docPos = canvasToDocument(pos.x, pos.y);
+                
+                if (currentTool === 'select') {
+                    isSelecting = true;
+                    selectionStartX = docPos.x;
+                    selectionStartY = docPos.y;
+                    selectionEndX = docPos.x;
+                    selectionEndY = docPos.y;
+                    
+                    // Clear previous selection
+                    selectedElements = [];
+                    updateElementsList();
+                } else if (currentTool === 'draw') {
+                    isDrawing = true;
+                    drawStartX = docPos.x;
+                    drawStartY = docPos.y;
+                    
+                    // Create a new path element
+                    const newElement = {
+                        type: 'path',
+                        points: [{x: docPos.x, y: docPos.y}],
+                        color: brushColorInput.value,
+                        size: parseInt(brushSizeInput.value),
+                        opacity: parseInt(brushOpacityInput.value) / 100
+                    };
+                    
+                    elements.push(newElement);
+                } else if (currentTool === 'shape') {
+                    isDrawing = true;
+                    drawStartX = docPos.x;
+                    drawStartY = docPos.y;
+                    
+                    // Create a new shape element
+                    const shapeType = shapeTypeSelect.value;
+                    const newElement = {
+                        type: shapeType === 'Rectangle' ? 'rectangle' : 
+                              shapeType === 'Circle' ? 'circle' : 'rectangle',
+                        startX: docPos.x,
+                        startY: docPos.y,
+                        endX: docPos.x,
+                        endY: docPos.y,
+                        fillColor: fillColorInput.value,
+                        strokeColor: strokeColorInput.value,
+                        strokeWidth: parseInt(strokeWidthInput.value),
+                        opacity: 1.0
+                    };
+                    
+                    elements.push(newElement);
+                } else if (currentTool === 'text') {
+                    // Create a new text element
+                    const text = prompt('Enter text:');
+                    if (text) {
+                        const newElement = {
+                            type: 'text',
+                            text: text,
+                            x: docPos.x,
+                            y: docPos.y,
+                            color: textColorInput.value,
+                            fontSize: parseInt(fontSizeInput.value),
+                            fontFamily: fontFamilySelect.value,
+                            opacity: 1.0
+                        };
+                        
+                        elements.push(newElement);
+                        redrawCanvas();
+                        updateElementsList();
+                    }
+                } else if (currentTool === 'eraser') {
+                    isDrawing = true;
+                    drawStartX = docPos.x;
+                    drawStartY = docPos.y;
+                    
+                    // Create a new path element for erasing
+                    const newElement = {
+                        type: 'path',
+                        points: [{x: docPos.x, y: docPos.y}],
+                        color: surroundingBgColor,
+                        size: parseInt(eraserSizeInput.value),
+                        opacity: parseInt(eraserOpacityInput.value) / 100
+                    };
+                    
+                    elements.push(newElement);
+                }
+            }
+        });
+        
+        // Mouse move event - draw or pan
+        mainCanvas.addEventListener('mousemove', (e) => {
+            // Update mouse position
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            if (viewLocked) return;
+            
+            if (isPanning) {
+                const deltaX = mouseX - panStartX;
+                const deltaY = mouseY - panStartY;
+                
+                // Update view position
+                viewX = panViewStartX + deltaX;
+                viewY = panViewStartY + deltaY;
+                
+                redrawCanvas();
+            } else if (isSelecting) {
+                const docPos = canvasToDocument(pos.x, pos.y);
+                selectionEndX = docPos.x;
+                selectionEndY = docPos.y;
+                
+                redrawCanvas();
+            } else if (isDrawing) {
+                const docPos = canvasToDocument(pos.x, pos.y);
+                
+                if (currentTool === 'draw' || currentTool === 'eraser') {
+                    // Add point to current path
+                    const currentElement = elements[elements.length - 1];
+                    currentElement.points.push({x: docPos.x, y: docPos.y});
+                    
+                    redrawCanvas();
+                } else if (currentTool === 'shape') {
+                    // Update the end position of the shape
+                    const currentElement = elements[elements.length - 1];
+                    currentElement.endX = docPos.x;
+                    currentElement.endY = docPos.y;
+                    
+                    redrawCanvas();
+                }
+            }
+        });
+        
+        // Mouse up event - stop drawing or panning
+        mainCanvas.addEventListener('mouseup', (e) => {
+            if (viewLocked) return;
+            
+            if (e.button === 2) { // Right mouse button
+                isPanning = false;
+                mainCanvas.style.cursor = 'grab';
+            } else if (e.button === 0) { // Left mouse button
+                if (isSelecting) {
+                    isSelecting = false;
+                    
+                    // Determine which elements are within the selection area
+                    const minX = Math.min(selectionStartX, selectionEndX);
+                    const maxX = Math.max(selectionStartX, selectionEndX);
+                    const minY = Math.min(selectionStartY, selectionEndY);
+                    const maxY = Math.max(selectionStartY, selectionEndY);
+                    
+                    selectedElements = [];
+                    
+                    elements.forEach((element, index) => {
+                        let isSelected = false;
+                        
+                        if (element.type === 'path') {
+                            // Check if any point in the path is within the selection area
+                            for (const point of element.points) {
+                                if (point.x >= minX && point.x <= maxX && 
+                                    point.y >= minY && point.y <= maxY) {
+                                    isSelected = true;
+                                    break;
+                                }
+                            }
+                        } else if (element.type === 'rectangle') {
+                            const x = Math.min(element.startX, element.endX);
+                            const y = Math.min(element.startY, element.endY);
+                            const width = Math.abs(element.endX - element.startX);
+                            const height = Math.abs(element.endY - element.startY);
+                            
+                            // Check if rectangle overlaps with selection area
+                            if (!(x + width < minX || x > maxX || y + height < minY || y > maxY)) {
+                                isSelected = true;
+                            }
+                        } else if (element.type === 'circle') {
+                            const centerX = (element.startX + element.endX) / 2;
+                            const centerY = (element.startY + element.endY) / 2;
+                            const radiusX = Math.abs(element.endX - element.startX) / 2;
+                            const radiusY = Math.abs(element.endY - element.startY) / 2;
+                            
+                            // Simple check if circle center is within selection area
+                            if (centerX >= minX && centerX <= maxX && 
+                                centerY >= minY && centerY <= maxY) {
+                                isSelected = true;
+                            }
+                        } else if (element.type === 'text') {
+                            // Simple check if text position is within selection area
+                            if (element.x >= minX && element.x <= maxX && 
+                                element.y >= minY && element.y <= maxY) {
+                                isSelected = true;
+                            }
+                        }
+                        
+                        if (isSelected) {
+                            selectedElements.push(index);
+                        }
+                    });
+                    
+                    updateElementsList();
+                    redrawCanvas();
+                } else if (isDrawing) {
+                    isDrawing = false;
+                    updateElementsList();
+                }
+            }
+        });
+        
+        // Mouse leave event - stop drawing or panning
+        mainCanvas.addEventListener('mouseleave', () => {
+            if (viewLocked) return;
+            
+            isPanning = false;
+            isDrawing = false;
+            isSelecting = false;
+            mainCanvas.style.cursor = 'grab';
+        });
+        
+        // Update elements list in the UI
+        function updateElementsList() {
+            const elementsList = document.getElementById('document-elements');
+            elementsList.innerHTML = '';
+            
+            if (elements.length === 0) {
+                const emptyMessage = document.createElement('li');
+                emptyMessage.className = 'empty-state';
+                emptyMessage.textContent = 'No elements yet. Start drawing to create elements.';
+                elementsList.appendChild(emptyMessage);
+                return;
+            }
+            
+            elements.forEach((element, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'element-item';
+                
+                // Add selected class if element is selected
+                if (selectedElements.includes(index)) {
+                    listItem.classList.add('selected');
+                }
+                
+                let elementName = '';
+                switch (element.type) {
+                    case 'path':
+                        elementName = currentTool === 'eraser' ? 'Eraser Stroke' : 'Brush Stroke';
+                        break;
+                    case 'rectangle':
+                        elementName = 'Rectangle';
+                        break;
+                    case 'circle':
+                        elementName = 'Circle';
+                        break;
+                    case 'text':
+                        elementName = `Text: "${element.text}"`;
+                        break;
+                }
+                
+                listItem.textContent = elementName;
+                listItem.addEventListener('click', () => {
+                    // Toggle selection
+                    const selectedIndex = selectedElements.indexOf(index);
+                    if (selectedIndex === -1) {
+                        selectedElements.push(index);
+                        listItem.classList.add('selected');
+                    } else {
+                        selectedElements.splice(selectedIndex, 1);
+                        listItem.classList.remove('selected');
+                    }
+                    
+                    redrawCanvas();
+                });
+                
+                elementsList.appendChild(listItem);
+            });
+        }
+        
+        // Mouse wheel event - zoom
+        mainCanvas.addEventListener('wheel', (e) => {
+            if (viewLocked) {
+                e.preventDefault();
+                return;
+            }
+            
+            e.preventDefault();
+            
+            // Get mouse position relative to canvas
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            // Determine zoom direction
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * zoomFactor));
+            
+            if (newZoom !== zoom) {
+                // Calculate mouse position in document coordinates
+                const docX = (mouseX - viewX) / zoom;
+                const docY = (mouseY - viewY) / zoom;
+                
+                // Adjust view position to zoom towards mouse position
+                viewX = mouseX - docX * newZoom;
+                viewY = mouseY - docY * newZoom;
+                zoom = newZoom;
+                
+                redrawCanvas();
+            }
+        });
+        
+        // Keyboard event handlers
+        document.addEventListener('keydown', (e) => {
+            if (viewLocked) return;
+            
+            // Check if Ctrl or Command is pressed DURING this key event
+            const isCtrlPressed = e.ctrlKey || e.metaKey;
+            
+            // Handle arrow keys when Ctrl is pressed
+            if (isCtrlPressed) {
+                let panned = false;
+                const panSpeed = 20;
+                
+                switch(e.key) {
+                    case 'ArrowUp':
+                        viewY += panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowDown':
+                        viewY -= panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowLeft':
+                        viewX += panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowRight':
+                        viewX -= panSpeed;
+                        panned = true;
+                        break;
+                }
+                
+                if (panned) {
+                    e.preventDefault(); // Prevent default scrolling behavior
+                    e.stopPropagation(); // Stop event propagation
+                    redrawCanvas();
+                }
+            }
+            
+            // Handle zoom with keyboard shortcuts (without Ctrl)
+            if (!isCtrlPressed) {
+                if (e.key === '+' || e.key === '=') {
+                    zoomIn(true);
+                    e.preventDefault();
+                } else if (e.key === '-' || e.key === '_') {
+                    zoomOut(true);
+                    e.preventDefault();
+                } else if (e.key === '5') {
+                    zoomFit();
+                    e.preventDefault();
+                }
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Initialize
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            zoomFit(); // Use zoomFit instead of recenter to ensure the document fits
+            selectToolHandler('select-tool');
+            updateElementsList();
+        });
+    </script>
+</body>
+</html>
