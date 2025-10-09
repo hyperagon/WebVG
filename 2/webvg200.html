@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebVG</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .menu-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            z-index: 100;
+            display: flex;
+        }
+        
+        .menu {
+            padding: 5px 10px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .menu:hover {
+            background: #e0e0e0;
+        }
+        
+        .menu-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+            min-width: 150px;
+            z-index: 101;
+        }
+        
+        .menu:hover .menu-dropdown {
+            display: block;
+        }
+        
+        .menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        
+        .menu-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .submenu {
+            position: relative;
+        }
+        
+        .submenu-content {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+            min-width: 120px;
+        }
+        
+        .submenu:hover .submenu-content {
+            display: block;
+        }
+        
+        #main-canvas {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            cursor: grab;
+        }
+        
+        #main-canvas:active {
+            cursor: grabbing;
+        }
+        
+        #main-canvas.locked {
+            cursor: default;
+        }
+        
+        /* Modal dialog styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 400px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        .modal-buttons {
+            text-align: right;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons button {
+            padding: 8px 15px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group input {
+            margin-right: 10px;
+        }
+        
+        /* Toggle styles */
+        .toggle-item {
+            display: inline-flex;
+            align-items: center;
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        
+        .toggle-indicator {
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="menu-bar">
+        <div class="menu">
+            File
+            <div class="menu-dropdown">
+                <div class="menu-item submenu">
+                    Export ▶
+                    <div class="submenu-content">
+                        <div class="menu-item" id="export-png">PNG</div>
+                        <div class="menu-item" id="export-jpeg">JPEG</div>
+                        <div class="menu-item" id="export-webp">WebP</div>
+                        <div class="menu-item" id="export-bmp">BMP</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="menu">
+            View
+            <div class="menu-dropdown">
+                <div class="menu-item" id="zoom-in">Zoom In</div>
+                <div class="menu-item" id="zoom-out">Zoom Out</div>
+                <div class="menu-item" id="zoom-fit">
+                    Fit to Screen
+                    <span class="toggle-item" id="toggle-lock">
+                        <span class="toggle-indicator">🔓</span>
+                    </span>
+                </div>
+                <div class="menu-item" id="zoom-100">100%</div>
+                <div class="menu-item" id="recenter">Recenter</div>
+            </div>
+        </div>
+        <div class="menu">
+            Configure
+            <div class="menu-dropdown">
+                <div class="menu-item" id="document-settings">Document...</div>
+                <div class="menu-item" id="grid-settings">
+                    Grid
+                    <span class="toggle-item" id="toggle-grid">
+                        <span class="toggle-indicator">❎</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <canvas id="main-canvas"></canvas>
+    
+    <!-- Document Settings Modal -->
+    <div id="document-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Document Settings</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="export-width">Export Width</label>
+                    <input type="number" id="export-width" min="100" max="5000" value="1280">
+                </div>
+                <div class="form-group">
+                    <label for="export-height">Export Height</label>
+                    <input type="number" id="export-height" min="100" max="5000" value="720">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="export-bg-color">Export Background</label>
+                    <input type="color" id="export-bg-color" value="#ffffff">
+                </div>
+                <div class="form-group">
+                    <label for="surrounding-bg-color">Surrounding Background</label>
+                    <input type="color" id="surrounding-bg-color" value="#d0d0d0">
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="transparent-bg" checked>
+                <label for="transparent-bg">Transparent Background in Export</label>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="cancel-settings">Cancel</button>
+                <button class="btn-primary" id="save-settings">OK</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Grid Settings Modal -->
+    <div id="grid-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Grid Settings</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="grid-size">Grid Size</label>
+                    <input type="number" id="grid-size" min="10" max="200" value="50">
+                </div>
+                <div class="form-group">
+                    <label for="grid-color">Grid Color</label>
+                    <input type="color" id="grid-color" value="#dddddd">
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="cancel-grid-settings">Cancel</button>
+                <button class="btn-primary" id="save-grid-settings">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get the canvas and context
+        const mainCanvas = document.getElementById('main-canvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        
+        // Export menu items
+        const exportPNG = document.getElementById('export-png');
+        const exportJPEG = document.getElementById('export-jpeg');
+        const exportWebP = document.getElementById('export-webp');
+        const exportBMP = document.getElementById('export-bmp');
+        const zoomInItem = document.getElementById('zoom-in');
+        const zoomOutItem = document.getElementById('zoom-out');
+        const zoomFitItem = document.getElementById('zoom-fit');
+        const zoom100Item = document.getElementById('zoom-100');
+        const recenterItem = document.getElementById('recenter');
+        const documentSettings = document.getElementById('document-settings');
+        const gridSettings = document.getElementById('grid-settings');
+        const toggleGrid = document.getElementById('toggle-grid');
+        const toggleLock = document.getElementById('toggle-lock');
+        
+        // Modal elements
+        const modal = document.getElementById('document-modal');
+        const gridModal = document.getElementById('grid-modal');
+        const exportWidthInput = document.getElementById('export-width');
+        const exportHeightInput = document.getElementById('export-height');
+        const exportBgColorInput = document.getElementById('export-bg-color');
+        const surroundingBgColorInput = document.getElementById('surrounding-bg-color');
+        const transparentBgInput = document.getElementById('transparent-bg');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        const cancelSettingsBtn = document.getElementById('cancel-settings');
+        
+        // Grid modal elements
+        const gridSizeInput = document.getElementById('grid-size');
+        const gridColorInput = document.getElementById('grid-color');
+        const saveGridSettingsBtn = document.getElementById('save-grid-settings');
+        const cancelGridSettingsBtn = document.getElementById('cancel-grid-settings');
+        
+        // Document settings
+        let exportWidth = 1280;
+        let exportHeight = 720;
+        let exportBgColor = '#ffffff';
+        let surroundingBgColor = '#d0d0d0';
+        let showGrid = true;
+        let transparentBg = true;
+        let viewLocked = false;
+        
+        // Grid settings
+        let gridSize = 50;
+        let gridColor = '#dddddd';
+        
+        // Canvas state
+        let viewX = 0;
+        let viewY = 0;
+        let zoom = 1.0;
+        const minZoom = 0.1;
+        const maxZoom = 5.0;
+        
+        // Panning state
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panViewStartX = 0;
+        let panViewStartY = 0;
+        
+        // Mouse position
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        // Modular Toggle System
+        class Toggle {
+            constructor(elementId, initialState, onChar = '●', offChar = '○') {
+                this.element = document.getElementById(elementId);
+                this.indicator = this.element.querySelector('.toggle-indicator');
+                this.state = initialState;
+                this.onChar = onChar;
+                this.offChar = offChar;
+                this.callbacks = [];
+                
+                // Set initial state
+                this.updateIndicator();
+                
+                // Add click event listener
+                this.element.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering parent menu item
+                    this.toggle();
+                });
+            }
+            
+            toggle() {
+                this.state = !this.state;
+                this.updateIndicator();
+                
+                // Call all callbacks
+                this.callbacks.forEach(callback => callback(this.state));
+            }
+            
+            updateIndicator() {
+                this.indicator.textContent = this.state ? this.onChar : this.offChar;
+            }
+            
+            setState(newState) {
+                this.state = newState;
+                this.updateIndicator();
+            }
+            
+            addCallback(callback) {
+                this.callbacks.push(callback);
+            }
+        }
+        
+        // Create the grid toggle with checkmark indicators
+        const gridToggle = new Toggle('toggle-grid', showGrid, '✅', '❎');
+        
+        // Add callback to update grid visibility when toggle changes
+        gridToggle.addCallback((state) => {
+            showGrid = state;
+            redrawCanvas();
+        });
+        
+        // Create the lock toggle with lock/unlock icons
+        const lockToggle = new Toggle('toggle-lock', viewLocked, '🔒', '🔓');
+        
+        // Add callback to handle lock toggle
+        lockToggle.addCallback((state) => {
+            viewLocked = state;
+            if (viewLocked) {
+                // Fit to screen when locking
+                zoomFit();
+                // Change cursor to default
+                mainCanvas.classList.add('locked');
+            } else {
+                // Restore grab cursor
+                mainCanvas.classList.remove('locked');
+            }
+        });
+        
+        // Set canvas to full window size (minus menu bar)
+        function resizeCanvas() {
+            mainCanvas.width = window.innerWidth;
+            mainCanvas.height = window.innerHeight - 30;
+            
+            // If view is locked, refit to screen
+            if (viewLocked) {
+                zoomFit();
+            } else {
+                redrawCanvas();
+            }
+        }
+        
+        // Draw everything
+        function redrawCanvas() {
+            // Clear canvas
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            // Draw gray background (entire canvas)
+            mainCtx.fillStyle = surroundingBgColor;
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            // Save context state
+            mainCtx.save();
+            
+            // Apply view transformations
+            mainCtx.translate(viewX, viewY);
+            mainCtx.scale(zoom, zoom);
+            
+            // Draw white document area (export area)
+            mainCtx.fillStyle = exportBgColor;
+            mainCtx.fillRect(0, 0, exportWidth, exportHeight);
+            
+            // Draw content on document area
+            drawContent();
+            
+            // Restore context state
+            mainCtx.restore();
+        }
+        
+        // Draw content on the document
+        function drawContent() {
+            // Draw grid if enabled
+            if (showGrid) {
+                mainCtx.strokeStyle = gridColor;
+                mainCtx.lineWidth = 1;
+                
+                for (let x = 0; x <= exportWidth; x += gridSize) {
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(x, 0);
+                    mainCtx.lineTo(x, exportHeight);
+                    mainCtx.stroke();
+                }
+                
+                for (let y = 0; y <= exportHeight; y += gridSize) {
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(0, y);
+                    mainCtx.lineTo(exportWidth, y);
+                    mainCtx.stroke();
+                }
+            }
+        }
+        
+        // Export functionality
+        function exportCanvas(format) {
+            // Create a temporary canvas for export
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = exportWidth;
+            tempCanvas.height = exportHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Fill background
+            if (format === 'jpeg' || !transparentBg) {
+                tempCtx.fillStyle = exportBgColor;
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            }
+            
+            // Draw content
+            drawContentForExport(tempCtx);
+            
+            // Set up export parameters
+            let mimeType, filename, quality;
+            
+            switch(format) {
+                case 'png':
+                    mimeType = 'image/png';
+                    filename = 'export.png';
+                    quality = undefined;
+                    break;
+                case 'jpeg':
+                    mimeType = 'image/jpeg';
+                    filename = 'export.jpg';
+                    quality = 0.9;
+                    break;
+                case 'webp':
+                    mimeType = 'image/webp';
+                    filename = 'export.webp';
+                    quality = 0.9;
+                    break;
+                case 'bmp':
+                    mimeType = 'image/bmp';
+                    filename = 'export.bmp';
+                    quality = undefined;
+                    break;
+            }
+            
+            // Create a download link
+            tempCanvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+            }, mimeType, quality);
+        }
+        
+        // Draw content for export (without grid)
+        function drawContentForExport(ctx) {
+            // No content to draw for export
+        }
+        
+        // Get mouse position relative to canvas
+        function getMousePos(e) {
+            const rect = mainCanvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+        
+        // Zoom functions
+        function zoomIn(centerOnCursor = false) {
+            if (viewLocked) return;
+            
+            if (zoom < maxZoom) {
+                const newZoom = Math.min(zoom * 1.2, maxZoom);
+                
+                if (centerOnCursor) {
+                    // Calculate mouse position in document coordinates
+                    const docX = (mouseX - viewX) / zoom;
+                    const docY = (mouseY - viewY) / zoom;
+                    
+                    // Adjust view position to zoom towards mouse position
+                    viewX = mouseX - docX * newZoom;
+                    viewY = mouseY - docY * newZoom;
+                } else {
+                    // Center on canvas
+                    viewX = (mainCanvas.width - exportWidth * newZoom) / 2;
+                    viewY = (mainCanvas.height - exportHeight * newZoom) / 2;
+                }
+                
+                zoom = newZoom;
+                redrawCanvas();
+            }
+        }
+        
+        function zoomOut(centerOnCursor = false) {
+            if (viewLocked) return;
+            
+            if (zoom > minZoom) {
+                const newZoom = Math.max(zoom / 1.2, minZoom);
+                
+                if (centerOnCursor) {
+                    // Calculate mouse position in document coordinates
+                    const docX = (mouseX - viewX) / zoom;
+                    const docY = (mouseY - viewY) / zoom;
+                    
+                    // Adjust view position to zoom towards mouse position
+                    viewX = mouseX - docX * newZoom;
+                    viewY = mouseY - docY * newZoom;
+                } else {
+                    // Center on canvas
+                    viewX = (mainCanvas.width - exportWidth * newZoom) / 2;
+                    viewY = (mainCanvas.height - exportHeight * newZoom) / 2;
+                }
+                
+                zoom = newZoom;
+                redrawCanvas();
+            }
+        }
+        
+        function zoomFit() {
+            // Calculate zoom to fit the document in the canvas
+            const zoomX = mainCanvas.width / exportWidth;
+            const zoomY = mainCanvas.height / exportHeight;
+            zoom = Math.min(zoomX, zoomY) * 0.9; // 90% to leave some margin
+            
+            // Center the document
+            viewX = (mainCanvas.width - exportWidth * zoom) / 2;
+            viewY = (mainCanvas.height - exportHeight * zoom) / 2;
+            
+            redrawCanvas();
+        }
+        
+        function zoom100() {
+            if (viewLocked) return;
+            
+            zoom = 1.0;
+            viewX = (mainCanvas.width - exportWidth) / 2;
+            viewY = (mainCanvas.height - exportHeight) / 2;
+            redrawCanvas();
+        }
+        
+        function recenter() {
+            if (viewLocked) return;
+            
+            viewX = (mainCanvas.width - exportWidth * zoom) / 2;
+            viewY = (mainCanvas.height - exportHeight * zoom) / 2;
+            redrawCanvas();
+        }
+        
+        // Add event listeners for export menu items
+        exportPNG.addEventListener('click', () => exportCanvas('png'));
+        exportJPEG.addEventListener('click', () => exportCanvas('jpeg'));
+        exportWebP.addEventListener('click', () => exportCanvas('webp'));
+        exportBMP.addEventListener('click', () => exportCanvas('bmp'));
+        
+        // Add event listeners for zoom menu items
+        zoomInItem.addEventListener('click', () => zoomIn(false));
+        zoomOutItem.addEventListener('click', () => zoomOut(false));
+        zoomFitItem.addEventListener('click', (e) => {
+            // Only trigger if not clicking on the toggle
+            if (e.target.id !== 'toggle-lock' && !e.target.closest('#toggle-lock')) {
+                if (!viewLocked) zoomFit();
+            }
+        });
+        zoom100Item.addEventListener('click', zoom100);
+        recenterItem.addEventListener('click', recenter);
+        
+        // Document settings modal
+        documentSettings.addEventListener('click', () => {
+            // Set current values in the form
+            exportWidthInput.value = exportWidth;
+            exportHeightInput.value = exportHeight;
+            exportBgColorInput.value = exportBgColor;
+            surroundingBgColorInput.value = surroundingBgColor;
+            transparentBgInput.checked = transparentBg;
+            
+            // Show the modal
+            modal.style.display = 'block';
+        });
+        
+        saveSettingsBtn.addEventListener('click', () => {
+            // Save the new settings
+            exportWidth = parseInt(exportWidthInput.value);
+            exportHeight = parseInt(exportHeightInput.value);
+            exportBgColor = exportBgColorInput.value;
+            surroundingBgColor = surroundingBgColorInput.value;
+            transparentBg = transparentBgInput.checked;
+            
+            // If view is locked, refit to screen with new dimensions
+            if (viewLocked) {
+                zoomFit();
+            } else {
+                // Recenter the document
+                recenter();
+            }
+            
+            // Hide the modal
+            modal.style.display = 'none';
+        });
+        
+        cancelSettingsBtn.addEventListener('click', () => {
+            // Hide the modal without saving
+            modal.style.display = 'none';
+        });
+        
+        // Grid settings modal
+        gridSettings.addEventListener('click', (e) => {
+            // Only trigger if not clicking on the toggle
+            if (e.target.id !== 'toggle-grid' && !e.target.closest('#toggle-grid')) {
+                // Set current values in the form
+                gridSizeInput.value = gridSize;
+                gridColorInput.value = gridColor;
+                
+                // Show the modal
+                gridModal.style.display = 'block';
+            }
+        });
+        
+        saveGridSettingsBtn.addEventListener('click', () => {
+            // Save the new settings
+            gridSize = parseInt(gridSizeInput.value);
+            gridColor = gridColorInput.value;
+            
+            // Redraw canvas
+            redrawCanvas();
+            
+            // Hide the modal
+            gridModal.style.display = 'none';
+        });
+        
+        cancelGridSettingsBtn.addEventListener('click', () => {
+            // Hide the modal without saving
+            gridModal.style.display = 'none';
+        });
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+            if (e.target === gridModal) {
+                gridModal.style.display = 'none';
+            }
+        });
+        
+        // Prevent context menu on right click
+        mainCanvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+        
+        // Mouse down event - start panning
+        mainCanvas.addEventListener('mousedown', (e) => {
+            if (viewLocked) return;
+            
+            if (e.button === 2) { // Right mouse button
+                isPanning = true;
+                const pos = getMousePos(e);
+                panStartX = pos.x;
+                panStartY = pos.y;
+                panViewStartX = viewX;
+                panViewStartY = viewY;
+                mainCanvas.style.cursor = 'grabbing';
+            }
+        });
+        
+        // Mouse move event - pan and track mouse position
+        mainCanvas.addEventListener('mousemove', (e) => {
+            // Update mouse position
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            if (viewLocked) return;
+            
+            if (isPanning) {
+                const deltaX = mouseX - panStartX;
+                const deltaY = mouseY - panStartY;
+                
+                // Update view position
+                viewX = panViewStartX + deltaX;
+                viewY = panViewStartY + deltaY;
+                
+                redrawCanvas();
+            }
+        });
+        
+        // Mouse up event - stop panning
+        mainCanvas.addEventListener('mouseup', (e) => {
+            if (viewLocked) return;
+            
+            if (e.button === 2) { // Right mouse button
+                isPanning = false;
+                mainCanvas.style.cursor = 'grab';
+            }
+        });
+        
+        // Mouse leave event - stop panning
+        mainCanvas.addEventListener('mouseleave', () => {
+            if (viewLocked) return;
+            
+            isPanning = false;
+            mainCanvas.style.cursor = 'grab';
+        });
+        
+        // Mouse wheel event - zoom
+        mainCanvas.addEventListener('wheel', (e) => {
+            if (viewLocked) {
+                e.preventDefault();
+                return;
+            }
+            
+            e.preventDefault();
+            
+            // Get mouse position relative to canvas
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            // Determine zoom direction
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * zoomFactor));
+            
+            if (newZoom !== zoom) {
+                // Calculate mouse position in document coordinates
+                const docX = (mouseX - viewX) / zoom;
+                const docY = (mouseY - viewY) / zoom;
+                
+                // Adjust view position to zoom towards mouse position
+                viewX = mouseX - docX * newZoom;
+                viewY = mouseY - docY * newZoom;
+                zoom = newZoom;
+                
+                redrawCanvas();
+            }
+        });
+        
+        // Keyboard event handlers
+        document.addEventListener('keydown', (e) => {
+            if (viewLocked) return;
+            
+            // Check if Ctrl or Command is pressed DURING this key event
+            const isCtrlPressed = e.ctrlKey || e.metaKey;
+            
+            // Handle arrow keys when Ctrl is pressed
+            if (isCtrlPressed) {
+                let panned = false;
+                const panSpeed = 20;
+                
+                switch(e.key) {
+                    case 'ArrowUp':
+                        viewY += panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowDown':
+                        viewY -= panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowLeft':
+                        viewX += panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowRight':
+                        viewX -= panSpeed;
+                        panned = true;
+                        break;
+                }
+                
+                if (panned) {
+                    e.preventDefault(); // Prevent default scrolling behavior
+                    e.stopPropagation(); // Stop event propagation
+                    redrawCanvas();
+                }
+            }
+            
+            // Handle zoom with keyboard shortcuts (without Ctrl)
+            if (!isCtrlPressed) {
+                if (e.key === '+' || e.key === '=') {
+                    zoomIn(true);
+                    e.preventDefault();
+                } else if (e.key === '-' || e.key === '_') {
+                    zoomOut(true);
+                    e.preventDefault();
+                } else if (e.key === '5') {
+                    zoomFit();
+                    e.preventDefault();
+                }
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Initialize
+        resizeCanvas();
+        recenter();
+    </script>
+</body>
+</html>
