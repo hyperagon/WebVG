@@ -1,0 +1,2642 @@
+<!DOCTYPE html>
+<!--
+selection box should be offset by 5 px
+
+selection box should have handles to resize an object, locked to each of the 8 axis
+
+too sensitive, how do I nerf it?
+
+how about instead of all this you resize it to cursor position, full control
+
+so why is there no ellipse button yet also PATHS can't be resized (that's a statement as in don't show handles for them)
+
+um there's no ellipse button, are you alright? anyway left-clicking should allow me to drag objects
+
+DUDE. WHY IS THERE A CIRCLE AND ELLIPSE BUTTON? ONLY GIVE ME THE ELLIPSE ONE. ALSO THE WHOLE THING IN A FILE NOT SEVERAL FILES
+
+ellipses aren't being selected, what gives? Also selecting multiple things should put a bounding box around the whole things without handles.
+
+the more I zoom out the bigger the selection/boundingbox should be
+
+it's incomplete
+
+Add an Edit menu option after File with Undo, Redo, Copy Paste and Dusplicate.
+
+Assign key combinations to Edit items:
+Undo = Ctrl+Z
+Redo = Ctrl+Ahift+Z
+Copy = Ctrl+C
+Paste = Ctrl+V
+Duplicate = Ctrl+D (Copies and Pastes in place)
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebVG</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .menu-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            z-index: 100;
+            display: flex;
+        }
+        
+        .menu {
+            padding: 5px 10px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .menu:hover {
+            background: #e0e0e0;
+        }
+        
+        .menu-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+            min-width: 150px;
+            z-index: 101;
+        }
+        
+        .menu:hover .menu-dropdown {
+            display: block;
+        }
+        
+        .menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        
+        .menu-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .submenu {
+            position: relative;
+        }
+        
+        .submenu-content {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+            min-width: 120px;
+        }
+        
+        .submenu:hover .submenu-content {
+            display: block;
+        }
+        
+        /* Left toolbar styles */
+        .left-toolbar {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            width: 50px;
+            bottom: 0;
+            background: #e8e8e8;
+            border-right: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 10px;
+            z-index: 50;
+        }
+        
+        .toolbar-button {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 5px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.2s;
+        }
+        
+        .toolbar-button:hover {
+            background: #d0d0d0;
+        }
+        
+        .toolbar-button.active {
+            background: #c0c0c0;
+            border-color: #999;
+        }
+        
+        .toolbar-separator {
+            width: 30px;
+            height: 1px;
+            background: #ccc;
+            margin: 10px 0;
+        }
+        
+        /* Right pane styles */
+        .right-pane {
+            position: absolute;
+            top: 30px;
+            right: 0;
+            width: 250px;
+            bottom: 0;
+            background: #f5f5f5;
+            border-left: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+        
+        .pane-tabs {
+            display: flex;
+            border-bottom: 1px solid #ccc;
+            background: #e8e8e8;
+        }
+        
+        .pane-tab {
+            flex: 1;
+            padding: 8px 0;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .pane-tab:hover {
+            background: #ddd;
+        }
+        
+        .pane-tab.active {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+        }
+        
+        .pane-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .tab-panel {
+            display: none;
+        }
+        
+        .tab-panel.active {
+            display: block;
+        }
+        
+        .tool-section {
+            margin-bottom: 15px;
+        }
+        
+        .tool-section-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        
+        .tool-option {
+            margin-bottom: 10px;
+        }
+        
+        .tool-option-label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 4px;
+            color: #666;
+        }
+        
+        .tool-option-input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .tool-option-select {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .tool-option-color {
+            width: 100%;
+            height: 30px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .tool-option-range {
+            width: 100%;
+        }
+        
+        .element-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .element-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .element-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .element-item.selected {
+            background: #e0f0e0;
+            border-color: #4CAF50;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 20px 0;
+        }
+        
+        #main-canvas {
+            position: absolute;
+            top: 30px;
+            left: 50px;
+            cursor: pointer;
+            background-color: #d0d0d0; /* Set the background color here */
+        }
+        
+        #main-canvas.panning {
+            cursor: grab;
+        }
+        
+        #main-canvas.panning-active {
+            cursor: grabbing;
+        }
+        
+        #main-canvas.locked {
+            cursor: default;
+        }
+        
+        /* Modal dialog styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 400px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        .modal-buttons {
+            text-align: right;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons button {
+            padding: 8px 15px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group input {
+            margin-right: 10px;
+        }
+        
+        /* Toggle styles */
+        .toggle-item {
+            display: inline-flex;
+            align-items: center;
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        
+        .toggle-indicator {
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        /* Keyboard shortcut hint styles */
+        .shortcut-hint {
+            font-size: 11px;
+            color: #888;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="menu-bar">
+        <div class="menu">
+            File
+            <div class="menu-dropdown">
+                <div class="menu-item submenu">
+                    Export ▶
+                    <div class="submenu-content">
+                        <div class="menu-item" id="export-png">PNG</div>
+                        <div class="menu-item" id="export-jpeg">JPEG</div>
+                        <div class="menu-item" id="export-webp">WebP</div>
+                        <div class="menu-item" id="export-bmp">BMP</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="menu">
+            Edit
+            <div class="menu-dropdown">
+                <div class="menu-item" id="undo">Undo<span class="shortcut-hint">Ctrl+Z</span></div>
+                <div class="menu-item" id="redo">Redo<span class="shortcut-hint">Ctrl+Shift+Z</span></div>
+                <div class="menu-item" id="copy">Copy<span class="shortcut-hint">Ctrl+C</span></div>
+                <div class="menu-item" id="paste">Paste<span class="shortcut-hint">Ctrl+V</span></div>
+                <div class="menu-item" id="duplicate">Duplicate<span class="shortcut-hint">Ctrl+D</span></div>
+            </div>
+        </div>
+        <div class="menu">
+            View
+            <div class="menu-dropdown">
+                <div class="menu-item" id="zoom-in">Zoom In</div>
+                <div class="menu-item" id="zoom-out">Zoom Out</div>
+                <div class="menu-item" id="zoom-fit">
+                    Fit to Screen
+                    <span class="toggle-item" id="toggle-lock">
+                        <span class="toggle-indicator">🔓</span>
+                    </span>
+                </div>
+                <div class="menu-item" id="zoom-100">100%</div>
+                <div class="menu-item" id="recenter">Recenter</div>
+            </div>
+        </div>
+        <div class="menu">
+            Configure
+            <div class="menu-dropdown">
+                <div class="menu-item" id="document-settings">Document...</div>
+                <div class="menu-item" id="grid-settings">
+                    Grid
+                    <span class="toggle-item" id="toggle-grid">
+                        <span class="toggle-indicator">❎</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Left Toolbar -->
+    <div class="left-toolbar">
+        <div class="toolbar-button" id="select-tool" title="Select Tool">↖</div>
+        <div class="toolbar-button" id="draw-tool" title="Draw Tool">✏️</div>
+        <div class="toolbar-button" id="text-tool" title="Text Tool">T</div>
+        <div class="toolbar-button" id="rectangle-tool" title="Rectangle Tool">⬜</div>
+        <div class="toolbar-button" id="ellipse-tool" title="Ellipse Tool">⬭</div>
+        <div class="toolbar-separator"></div>
+        <div class="toolbar-button" id="fill-tool" title="Fill Tool">🪣</div>
+        <div class="toolbar-button" id="eraser-tool" title="Eraser Tool">🧽</div>
+    </div>
+    
+    <!-- Right Pane -->
+    <div class="right-pane">
+        <div class="pane-tabs">
+            <div class="pane-tab active" data-tab="options">Options</div>
+            <div class="pane-tab" data-tab="elements">Elements</div>
+        </div>
+        <div class="pane-content">
+            <!-- Options Tab -->
+            <div id="options-tab" class="tab-panel active">
+                <div class="empty-state">
+                    Select a tool to see its options
+                </div>
+                
+                <!-- Select Tool Options -->
+                <div id="select-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Selection Options</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Selection Mode</label>
+                            <select class="tool-option-select">
+                                <option>Rectangle</option>
+                                <option>Ellipse</option>
+                                <option>Lasso</option>
+                            </select>
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Feather</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Draw Tool Options -->
+                <div id="draw-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Brush Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Brush Size</label>
+                            <input type="range" class="tool-option-range" min="1" max="100" value="5" id="brush-size">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Brush Opacity</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="100" id="brush-opacity">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Brush Color</label>
+                            <input type="color" class="tool-option-color" value="#000000" id="brush-color">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Text Tool Options -->
+                <div id="text-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Text Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Font Family</label>
+                            <select class="tool-option-select" id="font-family">
+                                <option>Arial</option>
+                                <option>Times New Roman</option>
+                                <option>Courier New</option>
+                                <option>Verdana</option>
+                            </select>
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Font Size</label>
+                            <input type="number" class="tool-option-input" min="8" max="72" value="16" id="font-size">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Text Color</label>
+                            <input type="color" class="tool-option-color" value="#000000" id="text-color">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Shape Tool Options -->
+                <div id="shape-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Shape Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Fill Color</label>
+                            <input type="color" class="tool-option-color" value="#ff0000" id="fill-color">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Stroke Color</label>
+                            <input type="color" class="tool-option-color" value="#000000" id="stroke-color">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Stroke Width</label>
+                            <input type="range" class="tool-option-range" min="1" max="20" value="2" id="stroke-width">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Fill Tool Options -->
+                <div id="fill-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Fill Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Fill Color</label>
+                            <input type="color" class="tool-option-color" value="#00ff00" id="fill-color">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Tolerance</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="32" id="tolerance">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Eraser Tool Options -->
+                <div id="eraser-options" class="tool-options-panel" style="display: none;">
+                    <div class="tool-section">
+                        <div class="tool-section-title">Eraser Settings</div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Eraser Size</label>
+                            <input type="range" class="tool-option-range" min="1" max="100" value="20" id="eraser-size">
+                        </div>
+                        <div class="tool-option">
+                            <label class="tool-option-label">Eraser Opacity</label>
+                            <input type="range" class="tool-option-range" min="0" max="100" value="100" id="eraser-opacity">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Elements Tab -->
+            <div id="elements-tab" class="tab-panel">
+                <div class="empty-state">
+                    No elements yet. Start drawing to create elements.
+                </div>
+                <div class="tool-section">
+                    <div class="tool-section-title">Document Elements</div>
+                    <ul class="element-list" id="document-elements">
+                        <!-- Elements will be added here as they are created -->
+                    </ul>
+                </div>
+                <div class="tool-section">
+                    <div class="tool-section-title">Layers</div>
+                    <ul class="element-list" id="layers-list">
+                        <!-- Layers will be added here as they are created -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <canvas id="main-canvas"></canvas>
+    
+    <!-- Document Settings Modal -->
+    <div id="document-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Document Settings</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="export-width">Export Width</label>
+                    <input type="number" id="export-width" min="100" max="5000" value="1280">
+                </div>
+                <div class="form-group">
+                    <label for="export-height">Export Height</label>
+                    <input type="number" id="export-height" min="100" max="5000" value="720">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="export-bg-color">Export Background</label>
+                    <input type="color" id="export-bg-color" value="#ffffff">
+                </div>
+                <div class="form-group">
+                    <label for="surrounding-bg-color">Surrounding Background</label>
+                    <input type="color" id="surrounding-bg-color" value="#d0d0d0">
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="transparent-bg" checked>
+                <label for="transparent-bg">Transparent Background in Export</label>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="cancel-settings">Cancel</button>
+                <button class="btn-primary" id="save-settings">OK</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Grid Settings Modal -->
+    <div id="grid-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Grid Settings</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="grid-size">Grid Size</label>
+                    <input type="number" id="grid-size" min="10" max="200" value="50">
+                </div>
+                <div class="form-group">
+                    <label for="grid-color">Grid Color</label>
+                    <input type="color" id="grid-color" value="#dddddd">
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="cancel-grid-settings">Cancel</button>
+                <button class="btn-primary" id="save-grid-settings">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get the canvas and context
+        const mainCanvas = document.getElementById('main-canvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        
+        // Export menu items
+        const exportPNG = document.getElementById('export-png');
+        const exportJPEG = document.getElementById('export-jpeg');
+        const exportWebP = document.getElementById('export-webp');
+        const exportBMP = document.getElementById('export-bmp');
+        const zoomInItem = document.getElementById('zoom-in');
+        const zoomOutItem = document.getElementById('zoom-out');
+        const zoomFitItem = document.getElementById('zoom-fit');
+        const zoom100Item = document.getElementById('zoom-100');
+        const recenterItem = document.getElementById('recenter');
+        const documentSettings = document.getElementById('document-settings');
+        const gridSettings = document.getElementById('grid-settings');
+        const toggleGrid = document.getElementById('toggle-grid');
+        const toggleLock = document.getElementById('toggle-lock');
+        
+        // Edit menu items
+        const undoItem = document.getElementById('undo');
+        const redoItem = document.getElementById('redo');
+        const copyItem = document.getElementById('copy');
+        const pasteItem = document.getElementById('paste');
+        const duplicateItem = document.getElementById('duplicate');
+        
+        // Toolbar buttons
+        const selectTool = document.getElementById('select-tool');
+        const drawTool = document.getElementById('draw-tool');
+        const textTool = document.getElementById('text-tool');
+        const rectangleTool = document.getElementById('rectangle-tool');
+        const ellipseTool = document.getElementById('ellipse-tool');
+        const fillTool = document.getElementById('fill-tool');
+        const eraserTool = document.getElementById('eraser-tool');
+        
+        // Right pane tabs
+        const paneTabs = document.querySelectorAll('.pane-tab');
+        const tabPanels = document.querySelectorAll('.tab-panel');
+        const toolOptionsPanels = document.querySelectorAll('.tool-options-panel');
+        const emptyState = document.querySelector('.empty-state');
+        
+        // Modal elements
+        const modal = document.getElementById('document-modal');
+        const gridModal = document.getElementById('grid-modal');
+        const exportWidthInput = document.getElementById('export-width');
+        const exportHeightInput = document.getElementById('export-height');
+        const exportBgColorInput = document.getElementById('export-bg-color');
+        const surroundingBgColorInput = document.getElementById('surrounding-bg-color');
+        const transparentBgInput = document.getElementById('transparent-bg');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        const cancelSettingsBtn = document.getElementById('cancel-settings');
+        
+        // Grid modal elements
+        const gridSizeInput = document.getElementById('grid-size');
+        const gridColorInput = document.getElementById('grid-color');
+        const saveGridSettingsBtn = document.getElementById('save-grid-settings');
+        const cancelGridSettingsBtn = document.getElementById('cancel-grid-settings');
+        
+        // Tool option elements
+        const brushSizeInput = document.getElementById('brush-size');
+        const brushOpacityInput = document.getElementById('brush-opacity');
+        const brushColorInput = document.getElementById('brush-color');
+        const fontFamilySelect = document.getElementById('font-family');
+        const fontSizeInput = document.getElementById('font-size');
+        const textColorInput = document.getElementById('text-color');
+        const fillColorInput = document.getElementById('fill-color');
+        const strokeColorInput = document.getElementById('stroke-color');
+        const strokeWidthInput = document.getElementById('stroke-width');
+        const eraserSizeInput = document.getElementById('eraser-size');
+        const eraserOpacityInput = document.getElementById('eraser-opacity');
+        
+        // Document settings
+        let exportWidth = 1280;
+        let exportHeight = 720;
+        let exportBgColor = '#ffffff';
+        let surroundingBgColor = '#d0d0d0';
+        let showGrid = true;
+        let transparentBg = true;
+        let viewLocked = false;
+        
+        // Grid settings
+        let gridSize = 50;
+        let gridColor = '#dddddd';
+        
+        // Canvas state
+        let viewX = 0;
+        let viewY = 0;
+        let zoom = 1.0;
+        const minZoom = 0.1;
+        const maxZoom = 5.0;
+        
+        // Panning state
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panViewStartX = 0;
+        let panViewStartY = 0;
+        
+        // Mouse position
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        // Current tool
+        let currentTool = 'select';
+        
+        // Drawing state
+        let isDrawing = false;
+        let drawStartX = 0;
+        let drawStartY = 0;
+        let elements = [];
+        
+        // Selection state
+        let isSelecting = false;
+        let selectionStartX = 0;
+        let selectionStartY = 0;
+        let selectionEndX = 0;
+        let selectionEndY = 0;
+        let selectedElements = [];
+        
+        // Resize state
+        let isResizing = false;
+        let resizeHandle = null; // Which handle is being dragged
+        let resizeStartX = 0;
+        let resizeStartY = 0;
+        let originalElementBounds = null;
+        
+        // Dragging state
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let originalElementPositions = [];
+        
+        // History system for undo/redo
+        let history = [];
+        let historyStep = -1;
+        const maxHistory = 50; // Maximum number of history states to keep
+        
+        // Clipboard for copy/paste
+        let clipboard = [];
+        
+        // Define the 8 resize handles
+        const RESIZE_HANDLES = {
+            TOP_LEFT: 'top-left',
+            TOP: 'top',
+            TOP_RIGHT: 'top-right',
+            RIGHT: 'right',
+            BOTTOM_RIGHT: 'bottom-right',
+            BOTTOM: 'bottom',
+            BOTTOM_LEFT: 'bottom-left',
+            LEFT: 'left'
+        };
+        
+        // Modular Toggle System
+        class Toggle {
+            constructor(elementId, initialState, onChar = '●', offChar = '○') {
+                this.element = document.getElementById(elementId);
+                this.indicator = this.element.querySelector('.toggle-indicator');
+                this.state = initialState;
+                this.onChar = onChar;
+                this.offChar = offChar;
+                this.callbacks = [];
+                
+                // Set initial state
+                this.updateIndicator();
+                
+                // Add click event listener
+                this.element.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering parent menu item
+                    this.toggle();
+                });
+            }
+            
+            toggle() {
+                this.state = !this.state;
+                this.updateIndicator();
+                
+                // Call all callbacks
+                this.callbacks.forEach(callback => callback(this.state));
+            }
+            
+            updateIndicator() {
+                this.indicator.textContent = this.state ? this.onChar : this.offChar;
+            }
+            
+            setState(newState) {
+                this.state = newState;
+                this.updateIndicator();
+            }
+            
+            addCallback(callback) {
+                this.callbacks.push(callback);
+            }
+        }
+        
+        // Create the grid toggle with checkmark indicators
+        const gridToggle = new Toggle('toggle-grid', showGrid, '✅', '❎');
+        
+        // Add callback to update grid visibility when toggle changes
+        gridToggle.addCallback((state) => {
+            showGrid = state;
+            redrawCanvas();
+        });
+        
+        // Create the lock toggle with lock/unlock icons
+        const lockToggle = new Toggle('toggle-lock', viewLocked, '🔒', '🔓');
+        
+        // Add callback to handle lock toggle
+        lockToggle.addCallback((state) => {
+            viewLocked = state;
+            if (viewLocked) {
+                // Fit to screen when locking
+                zoomFit();
+                // Change cursor to default
+                mainCanvas.classList.add('locked');
+            } else {
+                // Restore grab cursor
+                mainCanvas.classList.remove('locked');
+            }
+        });
+        
+        // Save current state to history
+        function saveState() {
+            // Remove any states after the current step
+            history = history.slice(0, historyStep + 1);
+            
+            // Add current state
+            history.push(JSON.parse(JSON.stringify(elements)));
+            
+            // Limit history size
+            if (history.length > maxHistory) {
+                history.shift();
+            } else {
+                historyStep++;
+            }
+            
+            // Update undo/redo menu items
+            updateUndoRedoState();
+        }
+        
+        // Update undo/redo menu items state
+        function updateUndoRedoState() {
+            undoItem.style.opacity = historyStep > 0 ? '1' : '0.5';
+            redoItem.style.opacity = historyStep < history.length - 1 ? '1' : '0.5';
+        }
+        
+        // Undo last action
+        function undo() {
+            if (historyStep > 0) {
+                historyStep--;
+                elements = JSON.parse(JSON.stringify(history[historyStep]));
+                selectedElements = [];
+                updateElementsList();
+                redrawCanvas();
+                updateUndoRedoState();
+            }
+        }
+        
+        // Redo last undone action
+        function redo() {
+            if (historyStep < history.length - 1) {
+                historyStep++;
+                elements = JSON.parse(JSON.stringify(history[historyStep]));
+                selectedElements = [];
+                updateElementsList();
+                redrawCanvas();
+                updateUndoRedoState();
+            }
+        }
+        
+        // Copy selected elements to clipboard
+        function copySelectedElements() {
+            if (selectedElements.length === 0) return;
+            
+            clipboard = [];
+            
+            // Create copies of selected elements
+            selectedElements.forEach(index => {
+                if (elements[index]) {
+                    clipboard.push(JSON.parse(JSON.stringify(elements[index])));
+                }
+            });
+        }
+        
+        // Paste elements from clipboard
+        function pasteElements() {
+            if (clipboard.length === 0) return;
+            
+            // Clear current selection
+            selectedElements = [];
+            
+            // Add clipboard elements to the canvas with a small offset
+            const offset = 20;
+            clipboard.forEach(element => {
+                const newElement = JSON.parse(JSON.stringify(element));
+                
+                // Apply offset based on element type
+                if (newElement.type === 'path') {
+                    newElement.points.forEach(point => {
+                        point.x += offset;
+                        point.y += offset;
+                    });
+                } else if (newElement.type === 'rectangle' || newElement.type === 'circle') {
+                    newElement.startX += offset;
+                    newElement.startY += offset;
+                    newElement.endX += offset;
+                    newElement.endY += offset;
+                } else if (newElement.type === 'text') {
+                    newElement.x += offset;
+                    newElement.y += offset;
+                }
+                
+                elements.push(newElement);
+                selectedElements.push(elements.length - 1);
+            });
+            
+            saveState();
+            updateElementsList();
+            redrawCanvas();
+        }
+        
+        // Duplicate selected elements (copy and paste in place)
+        function duplicateSelectedElements() {
+            if (selectedElements.length === 0) return;
+            
+            // First copy the selected elements
+            copySelectedElements();
+            
+            // Clear current selection
+            selectedElements = [];
+            
+            // Add clipboard elements to the canvas without offset (in place)
+            clipboard.forEach(element => {
+                const newElement = JSON.parse(JSON.stringify(element));
+                
+                // No offset for duplicate (paste in place)
+                elements.push(newElement);
+                selectedElements.push(elements.length - 1);
+            });
+            
+            saveState();
+            updateElementsList();
+            redrawCanvas();
+        }
+        
+        // Set canvas to full window size (minus menu bar and toolbars)
+        function resizeCanvas() {
+            mainCanvas.width = window.innerWidth - 300; // Subtract left (50px) and right pane (250px) widths
+            mainCanvas.height = window.innerHeight - 30; // Subtract menu bar height
+            
+            // Set canvas background color
+            mainCanvas.style.backgroundColor = surroundingBgColor;
+            
+            // If view is locked, refit to screen
+            if (viewLocked) {
+                zoomFit();
+            } else {
+                redrawCanvas();
+            }
+        }
+        
+        // Draw everything
+        function redrawCanvas() {
+            // Clear canvas
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            // Draw gray background (entire canvas)
+            mainCtx.fillStyle = surroundingBgColor;
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            // Save context state
+            mainCtx.save();
+            
+            // Apply view transformations
+            mainCtx.translate(viewX, viewY);
+            mainCtx.scale(zoom, zoom);
+            
+            // Draw white document area (export area)
+            mainCtx.fillStyle = exportBgColor;
+            mainCtx.fillRect(0, 0, exportWidth, exportHeight);
+            
+            // Draw content on document area
+            drawContent();
+            
+            // Restore context state
+            mainCtx.restore();
+        }
+        
+        // Add this function to draw the resize handles
+        function drawResizeHandles(ctx, bounds, zoomLevel) {
+            const { x, y, width, height } = bounds;
+            // Scale the handle size based on zoom level - smaller zoom (zoomed out) means bigger handles
+            const handleSize = Math.max(8 / zoomLevel, 4); // Minimum size of 4px
+            
+            ctx.save();
+            ctx.fillStyle = '#000000';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1 / zoomLevel; // Scale line width as well
+            
+            // Top-left handle
+            drawHandle(ctx, x - handleSize/2, y - handleSize/2, handleSize);
+            
+            // Top handle
+            drawHandle(ctx, x + width/2 - handleSize/2, y - handleSize/2, handleSize);
+            
+            // Top-right handle
+            drawHandle(ctx, x + width - handleSize/2, y - handleSize/2, handleSize);
+            
+            // Right handle
+            drawHandle(ctx, x + width - handleSize/2, y + height/2 - handleSize/2, handleSize);
+            
+            // Bottom-right handle
+            drawHandle(ctx, x + width - handleSize/2, y + height - handleSize/2, handleSize);
+            
+            // Bottom handle
+            drawHandle(ctx, x + width/2 - handleSize/2, y + height - handleSize/2, handleSize);
+            
+            // Bottom-left handle
+            drawHandle(ctx, x - handleSize/2, y + height - handleSize/2, handleSize);
+            
+            // Left handle
+            drawHandle(ctx, x - handleSize/2, y + height/2 - handleSize/2, handleSize);
+            
+            ctx.restore();
+        }
+        
+        // Helper function to draw a single handle
+        function drawHandle(ctx, x, y, size) {
+            ctx.fillRect(x, y, size, size);
+            ctx.strokeRect(x, y, size, size);
+        }
+        
+        // Add this function to check if a point is inside a handle
+        function getHandleAtPoint(bounds, point, zoomLevel) {
+            const { x, y, width, height } = bounds;
+            // Scale the handle size and tolerance based on zoom level
+            const handleSize = Math.max(8 / zoomLevel, 4); // Minimum size of 4px
+            const tolerance = Math.max(5 / zoomLevel, 2); // Extra tolerance for easier selection, minimum of 2px
+            
+            // Define handle positions
+            const handles = [
+                { name: RESIZE_HANDLES.TOP_LEFT, x: x - handleSize/2, y: y - handleSize/2, width: handleSize, height: handleSize },
+                { name: RESIZE_HANDLES.TOP, x: x + width/2 - handleSize/2, y: y - handleSize/2, width: handleSize, height: handleSize },
+                { name: RESIZE_HANDLES.TOP_RIGHT, x: x + width - handleSize/2, y: y - handleSize/2, width: handleSize, height: handleSize },
+                { name: RESIZE_HANDLES.RIGHT, x: x + width - handleSize/2, y: y + height/2 - handleSize/2, width: handleSize, height: handleSize },
+                { name: RESIZE_HANDLES.BOTTOM_RIGHT, x: x + width - handleSize/2, y: y + height - handleSize/2, width: handleSize, height: handleSize },
+                { name: RESIZE_HANDLES.BOTTOM, x: x + width/2 - handleSize/2, y: y + height - handleSize/2, width: handleSize, height: handleSize },
+                { name: RESIZE_HANDLES.BOTTOM_LEFT, x: x - handleSize/2, y: y + height - handleSize/2, width: handleSize, height: handleSize },
+                { name: RESIZE_HANDLES.LEFT, x: x - handleSize/2, y: y + height/2 - handleSize/2, width: handleSize, height: handleSize }
+            ];
+            
+            // Check if point is inside any handle
+            for (const handle of handles) {
+                if (point.x >= handle.x - tolerance && 
+                    point.x <= handle.x + handle.width + tolerance &&
+                    point.y >= handle.y - tolerance && 
+                    point.y <= handle.y + handle.height + tolerance) {
+                    return handle.name;
+                }
+            }
+            
+            return null;
+        }
+        
+        // Add this function to resize an element
+        function resizeElement(element, handle, currentX, currentY) {
+            if (element.type === 'path') {
+                resizePath(element, handle, currentX, currentY);
+            } else if (element.type === 'rectangle') {
+                resizeRectangle(element, handle, currentX, currentY);
+            } else if (element.type === 'circle') {
+                resizeCircle(element, handle, currentX, currentY);
+            } else if (element.type === 'text') {
+                resizeText(element, handle, currentX, currentY);
+            }
+        }
+        
+        // Function to resize a rectangle
+        function resizeRectangle(element, handle, currentX, currentY) {
+            if (handle.includes('right')) {
+                element.endX = currentX;
+            } else if (handle.includes('left')) {
+                element.startX = currentX;
+            }
+            
+            if (handle.includes('bottom')) {
+                element.endY = currentY;
+            } else if (handle.includes('top')) {
+                element.startY = currentY;
+            }
+        }
+        
+        // Function to resize a circle
+        function resizeCircle(element, handle, currentX, currentY) {
+            if (handle.includes('right')) {
+                element.endX = currentX;
+            } else if (handle.includes('left')) {
+                element.startX = currentX;
+            }
+            
+            if (handle.includes('bottom')) {
+                element.endY = currentY;
+            } else if (handle.includes('top')) {
+                element.startY = currentY;
+            }
+        }
+        
+        // Function to resize a path
+        function resizePath(element, handle, currentX, currentY) {
+            const scaleX = handle.includes('right') ? currentX / originalElementBounds.x : 
+                           handle.includes('left') ? (originalElementBounds.x + originalElementBounds.width - currentX) / originalElementBounds.width : 1;
+            const scaleY = handle.includes('bottom') ? currentY / originalElementBounds.y : 
+                           handle.includes('top') ? (originalElementBounds.y + originalElementBounds.height - currentY) / originalElementBounds.height : 1;
+            
+            element.points.forEach(point => {
+                // Scale points relative to the original bounds
+                const relX = point.x - originalElementBounds.x;
+                const relY = point.y - originalElementBounds.y;
+                
+                point.x = originalElementBounds.x + relX * scaleX;
+                point.y = originalElementBounds.y + relY * scaleY;
+            });
+        }
+        
+        // Function to resize text (mainly position, as text size is controlled by font size)
+        function resizeText(element, handle, currentX, currentY) {
+            if (handle.includes('right')) {
+                // Text doesn't resize horizontally in this implementation
+            } else if (handle.includes('left')) {
+                element.x = currentX;
+            }
+            
+            if (handle.includes('bottom')) {
+                // Text doesn't resize vertically in this implementation
+            } else if (handle.includes('top')) {
+                element.y = currentY;
+            }
+        }
+        
+        // Function to start dragging
+        function startDragging(element, x, y) {
+            isDragging = true;
+            dragStartX = x;
+            dragStartY = y;
+            
+            // Store original positions for all selected elements
+            originalElementPositions = [];
+            selectedElements.forEach(index => {
+                const element = elements[index];
+                if (element) {
+                    if (element.type === 'path') {
+                        // For paths, store all points
+                        originalElementPositions.push({
+                            type: 'path',
+                            points: element.points.map(point => ({ ...point }))
+                        });
+                    } else if (element.type === 'rectangle') {
+                        originalElementPositions.push({
+                            type: 'rectangle',
+                            startX: element.startX,
+                            startY: element.startY,
+                            endX: element.endX,
+                            endY: element.endY
+                        });
+                    } else if (element.type === 'circle') {
+                        originalElementPositions.push({
+                            type: 'circle',
+                            startX: element.startX,
+                            startY: element.startY,
+                            endX: element.endX,
+                            endY: element.endY
+                        });
+                    } else if (element.type === 'text') {
+                        originalElementPositions.push({
+                            type: 'text',
+                            x: element.x,
+                            y: element.y
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Function to drag elements
+        function dragElements(deltaX, deltaY) {
+            selectedElements.forEach((index, i) => {
+                const element = elements[index];
+                const original = originalElementPositions[i];
+                
+                if (!element || !original) return;
+                
+                if (element.type === 'path') {
+                    // Move all points in the path
+                    element.points.forEach((point, j) => {
+                        point.x = original.points[j].x + deltaX;
+                        point.y = original.points[j].y + deltaY;
+                    });
+                } else if (element.type === 'rectangle') {
+                    element.startX = original.startX + deltaX;
+                    element.startY = original.startY + deltaY;
+                    element.endX = original.endX + deltaX;
+                    element.endY = original.endY + deltaY;
+                } else if (element.type === 'circle') {
+                    element.startX = original.startX + deltaX;
+                    element.startY = original.startY + deltaY;
+                    element.endX = original.endX + deltaX;
+                    element.endY = original.endY + deltaY;
+                } else if (element.type === 'text') {
+                    element.x = original.x + deltaX;
+                    element.y = original.y + deltaY;
+                }
+            });
+        }
+        
+        // Function to check if a point is inside an element
+        function isPointInElement(point, element) {
+            if (element.type === 'path') {
+                // Check if point is near any point in the path
+                for (const pathPoint of element.points) {
+                    const distance = Math.sqrt(
+                        Math.pow(point.x - pathPoint.x, 2) + 
+                        Math.pow(point.y - pathPoint.y, 2)
+                    );
+                    if (distance < 10) { // 10px tolerance
+                        return true;
+                    }
+                }
+                return false;
+            } else if (element.type === 'rectangle') {
+                const x = Math.min(element.startX, element.endX);
+                const y = Math.min(element.startY, element.endY);
+                const width = Math.abs(element.endX - element.startX);
+                const height = Math.abs(element.endY - element.startY);
+                
+                return point.x >= x && point.x <= x + width && 
+                       point.y >= y && point.y <= y + height;
+            } else if (element.type === 'circle') {
+                const centerX = (element.startX + element.endX) / 2;
+                const centerY = (element.startY + element.endY) / 2;
+                const radiusX = Math.abs(element.endX - element.startX) / 2;
+                const radiusY = Math.abs(element.endY - element.startY) / 2;
+                
+                // Simple bounding box check for circles
+                const boundsX = centerX - radiusX;
+                const boundsY = centerY - radiusY;
+                const boundsWidth = radiusX * 2;
+                const boundsHeight = radiusY * 2;
+                
+                return point.x >= boundsX && point.x <= boundsX + boundsWidth && 
+                       point.y >= boundsY && point.y <= boundsY + boundsHeight;
+            } else if (element.type === 'text') {
+                // Simple bounding box check for text
+                mainCtx.font = `${element.fontSize}px ${element.fontFamily}`;
+                const textWidth = mainCtx.measureText(element.text).width;
+                const textHeight = element.fontSize;
+                
+                return point.x >= element.x && point.x <= element.x + textWidth && 
+                       point.y >= element.y - textHeight && point.y <= element.y;
+            }
+            
+            return false;
+        }
+        
+        // Draw content on the document
+        function drawContent() {
+            // Draw grid if enabled
+            if (showGrid) {
+                mainCtx.strokeStyle = gridColor;
+                mainCtx.lineWidth = 1;
+                
+                for (let x = 0; x <= exportWidth; x += gridSize) {
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(x, 0);
+                    mainCtx.lineTo(x, exportHeight);
+                    mainCtx.stroke();
+                }
+                
+                for (let y = 0; y <= exportHeight; y += gridSize) {
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(0, y);
+                    mainCtx.lineTo(exportWidth, y);
+                    mainCtx.stroke();
+                }
+            }
+            
+            // Draw all elements
+            elements.forEach((element, index) => {
+                mainCtx.save();
+                
+                if (element.type === 'path') {
+                    mainCtx.strokeStyle = element.color;
+                    mainCtx.lineWidth = element.size;
+                    mainCtx.lineCap = 'round';
+                    mainCtx.lineJoin = 'round';
+                    mainCtx.globalAlpha = element.opacity;
+                    
+                    mainCtx.beginPath();
+                    mainCtx.moveTo(element.points[0].x, element.points[0].y);
+                    
+                    for (let i = 1; i < element.points.length; i++) {
+                        mainCtx.lineTo(element.points[i].x, element.points[i].y);
+                    }
+                    
+                    mainCtx.stroke();
+                } else if (element.type === 'rectangle') {
+                    mainCtx.fillStyle = element.fillColor;
+                    mainCtx.globalAlpha = element.opacity;
+                    
+                    const x = Math.min(element.startX, element.endX);
+                    const y = Math.min(element.startY, element.endY);
+                    const width = Math.abs(element.endX - element.startX);
+                    const height = Math.abs(element.endY - element.startY);
+                    
+                    // Fill the rectangle
+                    mainCtx.fillRect(x, y, width, height);
+                    
+                    // Only add stroke if stroke width is greater than 0
+                    if (element.strokeWidth > 0) {
+                        mainCtx.strokeStyle = element.strokeColor;
+                        mainCtx.lineWidth = element.strokeWidth;
+                        mainCtx.strokeRect(x, y, width, height);
+                    }
+                } else if (element.type === 'circle') {
+                    mainCtx.fillStyle = element.fillColor;
+                    mainCtx.globalAlpha = element.opacity;
+                    
+                    const centerX = (element.startX + element.endX) / 2;
+                    const centerY = (element.startY + element.endY) / 2;
+                    const radiusX = Math.abs(element.endX - element.startX) / 2;
+                    const radiusY = Math.abs(element.endY - element.startY) / 2;
+                    
+                    mainCtx.beginPath();
+                    mainCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                    mainCtx.fill();
+                    
+                    // Only add stroke if stroke width is greater than 0
+                    if (element.strokeWidth > 0) {
+                        mainCtx.strokeStyle = element.strokeColor;
+                        mainCtx.lineWidth = element.strokeWidth;
+                        mainCtx.stroke();
+                    }
+                } else if (element.type === 'text') {
+                    mainCtx.fillStyle = element.color;
+                    mainCtx.font = `${element.fontSize}px ${element.fontFamily}`;
+                    mainCtx.globalAlpha = element.opacity;
+                    mainCtx.fillText(element.text, element.x, element.y);
+                }
+                
+                mainCtx.restore();
+            });
+            
+            // Draw selection rectangle if selecting
+            if (isSelecting) {
+                mainCtx.save();
+                mainCtx.strokeStyle = '#000000'; // Changed to black
+                mainCtx.lineWidth = 1;
+                mainCtx.setLineDash([5, 5]);
+                
+                // Remove the 5px offset to match the actual selection area
+                const x = Math.min(selectionStartX, selectionEndX);
+                const y = Math.min(selectionStartY, selectionEndY);
+                const width = Math.abs(selectionEndX - selectionStartX);
+                const height = Math.abs(selectionEndY - selectionStartY);
+                
+                mainCtx.strokeRect(x, y, width, height);
+                mainCtx.restore();
+            }
+            
+            // Draw selection indicators for selected elements
+            mainCtx.save();
+            mainCtx.strokeStyle = '#000000'; // Black color
+            mainCtx.lineWidth = 1;
+            mainCtx.setLineDash([5, 5]); // Dotted line
+            
+            // Calculate the selection offset - always at least 5px, but increases when zoomed out
+            // When zoomed in (zoom > 1), keep it at 5px
+            // When zoomed out (zoom < 1), make it larger
+            const selectionOffset = zoom >= 1 ? 5 : Math.max(5, 5 / zoom);
+            
+            selectedElements.forEach(index => {
+                const element = elements[index];
+                if (!element) return;
+                
+                // Skip resize handles for paths
+                if (element.type === 'path') {
+                    // Just draw the selection box without handles
+                    let bounds;
+                    
+                    // Calculate bounds for path
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    
+                    element.points.forEach(point => {
+                        minX = Math.min(minX, point.x);
+                        minY = Math.min(minY, point.y);
+                        maxX = Math.max(maxX, point.x);
+                        maxY = Math.max(maxY, point.y);
+                    });
+                    
+                    bounds = {
+                        x: minX,
+                        y: minY,
+                        width: maxX - minX,
+                        height: maxY - minY
+                    };
+                    
+                    if (bounds) {
+                        // Draw selection indicator with offset
+                        mainCtx.strokeRect(
+                            bounds.x - selectionOffset,
+                            bounds.y - selectionOffset,
+                            bounds.width + (selectionOffset * 2),
+                            bounds.height + (selectionOffset * 2)
+                        );
+                    }
+                    return; // Skip the rest for paths
+                }
+                
+                let bounds;
+                
+                if (element.type === 'rectangle') {
+                    bounds = {
+                        x: Math.min(element.startX, element.endX),
+                        y: Math.min(element.startY, element.endY),
+                        width: Math.abs(element.endX - element.startX),
+                        height: Math.abs(element.endY - element.startY)
+                    };
+                } else if (element.type === 'circle') {
+                    const centerX = (element.startX + element.endX) / 2;
+                    const centerY = (element.startY + element.endY) / 2;
+                    const radiusX = Math.abs(element.endX - element.startX) / 2;
+                    const radiusY = Math.abs(element.endY - element.startY) / 2;
+                    
+                    bounds = {
+                        x: centerX - radiusX,
+                        y: centerY - radiusY,
+                        width: radiusX * 2,
+                        height: radiusY * 2
+                    };
+                } else if (element.type === 'text') {
+                    // Estimate text bounding box (rough approximation)
+                    mainCtx.font = `${element.fontSize}px ${element.fontFamily}`;
+                    const textWidth = mainCtx.measureText(element.text).width;
+                    const textHeight = element.fontSize;
+                    
+                    bounds = {
+                        x: element.x,
+                        y: element.y - textHeight,
+                        width: textWidth,
+                        height: textHeight
+                    };
+                }
+                
+                if (bounds) {
+                    // Draw selection indicator with offset
+                    mainCtx.strokeRect(
+                        bounds.x - selectionOffset,
+                        bounds.y - selectionOffset,
+                        bounds.width + (selectionOffset * 2),
+                        bounds.height + (selectionOffset * 2)
+                    );
+                    
+                    // Draw resize handles with size adjusted by zoom level
+                    drawResizeHandles(mainCtx, {
+                        x: bounds.x - selectionOffset,
+                        y: bounds.y - selectionOffset,
+                        width: bounds.width + (selectionOffset * 2),
+                        height: bounds.height + (selectionOffset * 2)
+                    }, zoom);
+                }
+            });
+            
+            mainCtx.restore();
+        }
+        
+        // Export functionality
+        function exportCanvas(format) {
+            // Create a temporary canvas for export
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = exportWidth;
+            tempCanvas.height = exportHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Fill background
+            if (format === 'jpeg' || !transparentBg) {
+                tempCtx.fillStyle = exportBgColor;
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            }
+            
+            // Draw content
+            drawContentForExport(tempCtx);
+            
+            // Set up export parameters
+            let mimeType, filename, quality;
+            
+            switch(format) {
+                case 'png':
+                    mimeType = 'image/png';
+                    filename = 'export.png';
+                    quality = undefined;
+                    break;
+                case 'jpeg':
+                    mimeType = 'image/jpeg';
+                    filename = 'export.jpg';
+                    quality = 0.9;
+                    break;
+                case 'webp':
+                    mimeType = 'image/webp';
+                    filename = 'export.webp';
+                    quality = 0.9;
+                    break;
+                case 'bmp':
+                    mimeType = 'image/bmp';
+                    filename = 'export.bmp';
+                    quality = undefined;
+                    break;
+            }
+            
+            // Create a download link
+            tempCanvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+            }, mimeType, quality);
+        }
+        
+        // Draw content for export (without grid)
+        function drawContentForExport(ctx) {
+            // Draw all elements
+            elements.forEach(element => {
+                ctx.save();
+                
+                if (element.type === 'path') {
+                    ctx.strokeStyle = element.color;
+                    ctx.lineWidth = element.size;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.globalAlpha = element.opacity;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(element.points[0].x, element.points[0].y);
+                    
+                    for (let i = 1; i < element.points.length; i++) {
+                        ctx.lineTo(element.points[i].x, element.points[i].y);
+                    }
+                    
+                    ctx.stroke();
+                } else if (element.type === 'rectangle') {
+                    ctx.fillStyle = element.fillColor;
+                    ctx.strokeStyle = element.strokeColor;
+                    ctx.lineWidth = element.strokeWidth;
+                    ctx.globalAlpha = element.opacity;
+                    
+                    const x = Math.min(element.startX, element.endX);
+                    const y = Math.min(element.startY, element.endY);
+                    const width = Math.abs(element.endX - element.startX);
+                    const height = Math.abs(element.endY - element.startY);
+                    
+                    ctx.fillRect(x, y, width, height);
+                    ctx.strokeRect(x, y, width, height);
+                } else if (element.type === 'circle') {
+                    ctx.fillStyle = element.fillColor;
+                    ctx.strokeStyle = element.strokeColor;
+                    ctx.lineWidth = element.strokeWidth;
+                    ctx.globalAlpha = element.opacity;
+                    
+                    const centerX = (element.startX + element.endX) / 2;
+                    const centerY = (element.startY + element.endY) / 2;
+                    const radiusX = Math.abs(element.endX - element.startX) / 2;
+                    const radiusY = Math.abs(element.endY - element.startY) / 2;
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (element.type === 'text') {
+                    ctx.fillStyle = element.color;
+                    ctx.font = `${element.fontSize}px ${element.fontFamily}`;
+                    ctx.globalAlpha = element.opacity;
+                    ctx.fillText(element.text, element.x, element.y);
+                }
+                
+                ctx.restore();
+            });
+        }
+        
+        // Get mouse position relative to canvas
+        function getMousePos(e) {
+            const rect = mainCanvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+        
+        // Convert canvas coordinates to document coordinates
+        function canvasToDocument(canvasX, canvasY) {
+            return {
+                x: (canvasX - viewX) / zoom,
+                y: (canvasY - viewY) / zoom
+            };
+        }
+        
+        // Zoom functions
+        function zoomIn(centerOnCursor = false) {
+            if (viewLocked) return;
+            
+            if (zoom < maxZoom) {
+                const newZoom = Math.min(zoom * 1.2, maxZoom);
+                
+                if (centerOnCursor) {
+                    // Calculate mouse position in document coordinates
+                    const docX = (mouseX - viewX) / zoom;
+                    const docY = (mouseY - viewY) / zoom;
+                    
+                    // Adjust view position to zoom towards mouse position
+                    viewX = mouseX - docX * newZoom;
+                    viewY = mouseY - docY * newZoom;
+                } else {
+                    // Center on canvas
+                    viewX = (mainCanvas.width - exportWidth * newZoom) / 2;
+                    viewY = (mainCanvas.height - exportHeight * newZoom) / 2;
+                }
+                
+                zoom = newZoom;
+                redrawCanvas();
+            }
+        }
+        
+        function zoomOut(centerOnCursor = false) {
+            if (viewLocked) return;
+            
+            if (zoom > minZoom) {
+                const newZoom = Math.max(zoom / 1.2, minZoom);
+                
+                if (centerOnCursor) {
+                    // Calculate mouse position in document coordinates
+                    const docX = (mouseX - viewX) / zoom;
+                    const docY = (mouseY - viewY) / zoom;
+                    
+                    // Adjust view position to zoom towards mouse position
+                    viewX = mouseX - docX * newZoom;
+                    viewY = mouseY - docY * newZoom;
+                } else {
+                    // Center on canvas
+                    viewX = (mainCanvas.width - exportWidth * newZoom) / 2;
+                    viewY = (mainCanvas.height - exportHeight * newZoom) / 2;
+                }
+                
+                zoom = newZoom;
+                redrawCanvas();
+            }
+        }
+        
+        function zoomFit() {
+            // Calculate zoom to fit the document in the canvas
+            const zoomX = mainCanvas.width / exportWidth;
+            const zoomY = mainCanvas.height / exportHeight;
+            zoom = Math.min(zoomX, zoomY); // Use 100% of available space
+            
+            // Center the document
+            viewX = (mainCanvas.width - exportWidth * zoom) / 2;
+            viewY = (mainCanvas.height - exportHeight * zoom) / 2;
+            
+            redrawCanvas();
+        }
+        
+        function zoom100() {
+            if (viewLocked) return;
+            
+            zoom = 1.0;
+            viewX = (mainCanvas.width - exportWidth) / 2;
+            viewY = (mainCanvas.height - exportHeight) / 2;
+            redrawCanvas();
+        }
+        
+        function recenter() {
+            if (viewLocked) return;
+            
+            viewX = (mainCanvas.width - exportWidth * zoom) / 2;
+            viewY = (mainCanvas.height - exportHeight * zoom) / 2;
+            redrawCanvas();
+        }
+        
+        // Tool selection
+        function selectToolHandler(toolId) {
+            // Remove active class from all tools
+            document.querySelectorAll('.toolbar-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // Add active class to selected tool
+            document.getElementById(toolId).classList.add('active');
+            
+            // Update current tool
+            currentTool = toolId.replace('-tool', '');
+            
+            // Update options panel to show the correct tool options
+            updateToolOptions(currentTool);
+            
+            // Update cursor based on tool
+            updateCursor();
+        }
+        
+        // Update cursor based on current tool
+        function updateCursor() {
+            if (viewLocked) {
+                mainCanvas.style.cursor = 'default';
+                return;
+            }
+            
+            switch (currentTool) {
+                case 'select':
+                    mainCanvas.style.cursor = 'default';
+                    break;
+                case 'text':
+                    mainCanvas.style.cursor = 'text';
+                    break;
+                case 'draw':
+                case 'eraser':
+                case 'rectangle':
+                case 'ellipse':
+                case 'fill':
+                    mainCanvas.style.cursor = 'crosshair';
+                    break;
+                default:
+                    mainCanvas.style.cursor = 'default';
+            }
+        }
+        
+        // Update tool options panel based on selected tool
+        function updateToolOptions(tool) {
+            // Hide all tool options panels
+            toolOptionsPanels.forEach(panel => {
+                panel.style.display = 'none';
+            });
+            
+            // Hide the empty state message
+            emptyState.style.display = 'none';
+            
+            // Show the panel for the selected tool
+            const toolPanel = document.getElementById(`${tool}-options`);
+            if (toolPanel) {
+                toolPanel.style.display = 'block';
+            } else if (tool === 'rectangle' || tool === 'ellipse') {
+                // Show shape options for rectangle and ellipse tools
+                document.getElementById('shape-options').style.display = 'block';
+            } else {
+                // If no panel exists for this tool, show the empty state
+                emptyState.style.display = 'block';
+            }
+        }
+        
+        // Add event listeners for export menu items
+        exportPNG.addEventListener('click', () => exportCanvas('png'));
+        exportJPEG.addEventListener('click', () => exportCanvas('jpeg'));
+        exportWebP.addEventListener('click', () => exportCanvas('webp'));
+        exportBMP.addEventListener('click', () => exportCanvas('bmp'));
+        
+        // Add event listeners for zoom menu items
+        zoomInItem.addEventListener('click', () => zoomIn(false));
+        zoomOutItem.addEventListener('click', () => zoomOut(false));
+        zoomFitItem.addEventListener('click', (e) => {
+            // Only trigger if not clicking on the toggle
+            if (e.target.id !== 'toggle-lock' && !e.target.closest('#toggle-lock')) {
+                if (!viewLocked) zoomFit();
+            }
+        });
+        zoom100Item.addEventListener('click', zoom100);
+        recenterItem.addEventListener('click', recenter);
+        
+        // Add event listeners for edit menu items
+        undoItem.addEventListener('click', undo);
+        redoItem.addEventListener('click', redo);
+        copyItem.addEventListener('click', copySelectedElements);
+        pasteItem.addEventListener('click', pasteElements);
+        duplicateItem.addEventListener('click', duplicateSelectedElements);
+        
+        // Document settings modal
+        documentSettings.addEventListener('click', () => {
+            // Set current values in the form
+            exportWidthInput.value = exportWidth;
+            exportHeightInput.value = exportHeight;
+            exportBgColorInput.value = exportBgColor;
+            surroundingBgColorInput.value = surroundingBgColor;
+            transparentBgInput.checked = transparentBg;
+            
+            // Show the modal
+            modal.style.display = 'block';
+        });
+        
+        saveSettingsBtn.addEventListener('click', () => {
+            // Save the new settings
+            exportWidth = parseInt(exportWidthInput.value);
+            exportHeight = parseInt(exportHeightInput.value);
+            exportBgColor = exportBgColorInput.value;
+            surroundingBgColor = surroundingBgColorInput.value;
+            transparentBg = transparentBgInput.checked;
+            
+            // Update canvas background color
+            mainCanvas.style.backgroundColor = surroundingBgColor;
+            
+            // If view is locked, refit to screen with new dimensions
+            if (viewLocked) {
+                zoomFit();
+            } else {
+                // Recenter the document
+                recenter();
+            }
+            
+            // Hide the modal
+            modal.style.display = 'none';
+        });
+        
+        cancelSettingsBtn.addEventListener('click', () => {
+            // Hide the modal without saving
+            modal.style.display = 'none';
+        });
+        
+        // Grid settings modal
+        gridSettings.addEventListener('click', (e) => {
+            // Only trigger if not clicking on the toggle
+            if (e.target.id !== 'toggle-grid' && !e.target.closest('#toggle-grid')) {
+                // Set current values in the form
+                gridSizeInput.value = gridSize;
+                gridColorInput.value = gridColor;
+                
+                // Show the modal
+                gridModal.style.display = 'block';
+            }
+        });
+        
+        saveGridSettingsBtn.addEventListener('click', () => {
+            // Save the new settings
+            gridSize = parseInt(gridSizeInput.value);
+            gridColor = gridColorInput.value;
+            
+            // Redraw canvas
+            redrawCanvas();
+            
+            // Hide the modal
+            gridModal.style.display = 'none';
+        });
+        
+        cancelGridSettingsBtn.addEventListener('click', () => {
+            // Hide the modal without saving
+            gridModal.style.display = 'none';
+        });
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+            if (e.target === gridModal) {
+                gridModal.style.display = 'none';
+            }
+        });
+        
+        // Toolbar button event listeners
+        selectTool.addEventListener('click', () => selectToolHandler('select-tool'));
+        drawTool.addEventListener('click', () => selectToolHandler('draw-tool'));
+        textTool.addEventListener('click', () => selectToolHandler('text-tool'));
+        rectangleTool.addEventListener('click', () => selectToolHandler('rectangle-tool'));
+        ellipseTool.addEventListener('click', () => selectToolHandler('ellipse-tool'));
+        fillTool.addEventListener('click', () => selectToolHandler('fill-tool'));
+        eraserTool.addEventListener('click', () => selectToolHandler('eraser-tool'));
+        
+        // Right pane tab event listeners
+        paneTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                paneTabs.forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Hide all tab panels
+                tabPanels.forEach(panel => {
+                    panel.classList.remove('active');
+                });
+                
+                // Show the corresponding tab panel
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+        
+        // Prevent context menu on right click
+        mainCanvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+        
+        // Mouse down event - start drawing, panning, or dragging
+        mainCanvas.addEventListener('mousedown', (e) => {
+            if (viewLocked) return;
+            
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            if (e.button === 2) { // Right mouse button - panning
+                isPanning = true;
+                panStartX = pos.x;
+                panStartY = pos.y;
+                panViewStartX = viewX;
+                panViewStartY = viewY;
+                mainCanvas.classList.add('panning-active');
+            } else if (e.button === 0) { // Left mouse button
+                const docPos = canvasToDocument(pos.x, pos.y);
+                
+                // Check if we're clicking on a resize handle (only for non-path elements)
+                if (selectedElements.length > 0 && elements[selectedElements[0]].type !== 'path') {
+                    const element = elements[selectedElements[0]];
+                    if (element) {
+                        let bounds;
+                        
+                        // Calculate bounds for the element
+                        if (element.type === 'rectangle') {
+                            bounds = {
+                                x: Math.min(element.startX, element.endX),
+                                y: Math.min(element.startY, element.endY),
+                                width: Math.abs(element.endX - element.startX),
+                                height: Math.abs(element.endY - element.startY)
+                            };
+                        } else if (element.type === 'circle') {
+                            const centerX = (element.startX + element.endX) / 2;
+                            const centerY = (element.startY + element.endY) / 2;
+                            const radiusX = Math.abs(element.endX - element.startX) / 2;
+                            const radiusY = Math.abs(element.endY - element.startY) / 2;
+                            
+                            bounds = {
+                                x: centerX - radiusX,
+                                y: centerY - radiusY,
+                                width: radiusX * 2,
+                                height: radiusY * 2
+                            };
+                        } else if (element.type === 'text') {
+                            // Estimate text bounding box (rough approximation)
+                            mainCtx.font = `${element.fontSize}px ${element.fontFamily}`;
+                            const textWidth = mainCtx.measureText(element.text).width;
+                            const textHeight = element.fontSize;
+                            
+                            bounds = {
+                                x: element.x,
+                                y: element.y - textHeight,
+                                width: textWidth,
+                                height: textHeight
+                            };
+                        }
+                        
+                        if (bounds) {
+                            // Adjust bounds to include the 5px selection border
+                            const selectionBounds = {
+                                x: bounds.x - 5,
+                                y: bounds.y - 5,
+                                width: bounds.width + 10,
+                                height: bounds.height + 10
+                            };
+                            
+                            // Check if we clicked on a resize handle
+                            const handle = getHandleAtPoint(selectionBounds, docPos, zoom);
+                            if (handle) {
+                                isResizing = true;
+                                resizeHandle = handle;
+                                resizeStartX = docPos.x;
+                                resizeStartY = docPos.y;
+                                originalElementBounds = { ...bounds };
+                                return;
+                            }
+                        }
+                    }
+                }
+                
+                // Check if we're clicking on a selected element to drag it
+                if (selectedElements.length > 0) {
+                    let clickedOnElement = false;
+                    
+                    for (const index of selectedElements) {
+                        const element = elements[index];
+                        if (element && isPointInElement(docPos, element)) {
+                            startDragging(element, docPos.x, docPos.y);
+                            clickedOnElement = true;
+                            break;
+                        }
+                    }
+                    
+                    if (clickedOnElement) return;
+                }
+                
+                // Existing tool handling
+                if (currentTool === 'select') {
+                    isSelecting = true;
+                    selectionStartX = docPos.x;
+                    selectionStartY = docPos.y;
+                    selectionEndX = docPos.x;
+                    selectionEndY = docPos.y;
+                    
+                    // Clear previous selection
+                    selectedElements = [];
+                    updateElementsList();
+                } else if (currentTool === 'draw') {
+                    isDrawing = true;
+                    drawStartX = docPos.x;
+                    drawStartY = docPos.y;
+                    
+                    // Create a new path element
+                    const newElement = {
+                        type: 'path',
+                        points: [{x: docPos.x, y: docPos.y}],
+                        color: brushColorInput.value,
+                        size: parseInt(brushSizeInput.value),
+                        opacity: parseInt(brushOpacityInput.value) / 100
+                    };
+                    
+                    elements.push(newElement);
+                } else if (currentTool === 'rectangle' || currentTool === 'ellipse') {
+                    isDrawing = true;
+                    drawStartX = docPos.x;
+                    drawStartY = docPos.y;
+                    
+                    // Create a new shape element
+                    const newElement = {
+                        type: currentTool === 'rectangle' ? 'rectangle' : 'circle',
+                        startX: docPos.x,
+                        startY: docPos.y,
+                        endX: docPos.x,
+                        endY: docPos.y,
+                        fillColor: fillColorInput.value,
+                        strokeColor: strokeColorInput.value,
+                        strokeWidth: parseInt(strokeWidthInput.value),
+                        opacity: 1.0,
+                        shapeType: currentTool === 'ellipse' ? 'Ellipse' : 'Rectangle'
+                    };
+                    
+                    elements.push(newElement);
+                } else if (currentTool === 'text') {
+                    // Create a new text element
+                    const text = prompt('Enter text:');
+                    if (text) {
+                        const newElement = {
+                            type: 'text',
+                            text: text,
+                            x: docPos.x,
+                            y: docPos.y,
+                            color: textColorInput.value,
+                            fontSize: parseInt(fontSizeInput.value),
+                            fontFamily: fontFamilySelect.value,
+                            opacity: 1.0
+                        };
+                        
+                        elements.push(newElement);
+                        saveState();
+                        redrawCanvas();
+                        updateElementsList();
+                    }
+                } else if (currentTool === 'eraser') {
+                    isDrawing = true;
+                    drawStartX = docPos.x;
+                    drawStartY = docPos.y;
+                    
+                    // Create a new path element for erasing
+                    const newElement = {
+                        type: 'path',
+                        points: [{x: docPos.x, y: docPos.y}],
+                        color: surroundingBgColor,
+                        size: parseInt(eraserSizeInput.value),
+                        opacity: parseInt(eraserOpacityInput.value) / 100
+                    };
+                    
+                    elements.push(newElement);
+                }
+            }
+        });
+        
+        // Mouse move event - draw, pan, resize, or drag
+        mainCanvas.addEventListener('mousemove', (e) => {
+            // Update mouse position
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            if (viewLocked) return;
+            
+            if (isPanning) {
+                const deltaX = mouseX - panStartX;
+                const deltaY = mouseY - panStartY;
+                
+                // Update view position
+                viewX = panViewStartX + deltaX;
+                viewY = panViewStartY + deltaY;
+                
+                redrawCanvas();
+            } else if (isResizing) {
+                const docPos = canvasToDocument(pos.x, pos.y);
+                
+                // Resize each selected element
+                selectedElements.forEach(index => {
+                    const element = elements[index];
+                    if (element) {
+                        resizeElement(element, resizeHandle, docPos.x, docPos.y);
+                    }
+                });
+                
+                redrawCanvas();
+            } else if (isDragging) {
+                const docPos = canvasToDocument(pos.x, pos.y);
+                const deltaX = docPos.x - dragStartX;
+                const deltaY = docPos.y - dragStartY;
+                
+                dragElements(deltaX, deltaY);
+                redrawCanvas();
+            } else if (isSelecting) {
+                const docPos = canvasToDocument(pos.x, pos.y);
+                selectionEndX = docPos.x;
+                selectionEndY = docPos.y;
+                
+                redrawCanvas();
+            } else if (isDrawing) {
+                const docPos = canvasToDocument(pos.x, pos.y);
+                
+                if (currentTool === 'draw' || currentTool === 'eraser') {
+                    // Add point to current path
+                    const currentElement = elements[elements.length - 1];
+                    currentElement.points.push({x: docPos.x, y: docPos.y});
+                    
+                    redrawCanvas();
+                } else if (currentTool === 'rectangle' || currentTool === 'ellipse') {
+                    // Update the end position of the shape
+                    const currentElement = elements[elements.length - 1];
+                    currentElement.endX = docPos.x;
+                    currentElement.endY = docPos.y;
+                    
+                    redrawCanvas();
+                }
+            }
+            
+            // Update cursor based on whether we're over a resize handle
+            if (selectedElements.length > 0 && !isResizing && !isDragging && !isDrawing && !isSelecting) {
+                const element = elements[selectedElements[0]];
+                if (element && element.type !== 'path') {
+                    let bounds;
+                    
+                    // Calculate bounds for the element (same as in mousedown)
+                    if (element.type === 'rectangle') {
+                        bounds = {
+                            x: Math.min(element.startX, element.endX),
+                            y: Math.min(element.startY, element.endY),
+                            width: Math.abs(element.endX - element.startX),
+                            height: Math.abs(element.endY - element.startY)
+                        };
+                    } else if (element.type === 'circle') {
+                        const centerX = (element.startX + element.endX) / 2;
+                        const centerY = (element.startY + element.endY) / 2;
+                        const radiusX = Math.abs(element.endX - element.startX) / 2;
+                        const radiusY = Math.abs(element.endY - element.startY) / 2;
+                        
+                        bounds = {
+                            x: centerX - radiusX,
+                            y: centerY - radiusY,
+                            width: radiusX * 2,
+                            height: radiusY * 2
+                        };
+                    } else if (element.type === 'text') {
+                        // Estimate text bounding box (rough approximation)
+                        mainCtx.font = `${element.fontSize}px ${element.fontFamily}`;
+                        const textWidth = mainCtx.measureText(element.text).width;
+                        const textHeight = element.fontSize;
+                        
+                        bounds = {
+                            x: element.x,
+                            y: element.y - textHeight,
+                            width: textWidth,
+                            height: textHeight
+                        };
+                    }
+                    
+                    if (bounds) {
+                        // Adjust bounds to include the 5px selection border
+                        const selectionBounds = {
+                            x: bounds.x - 5,
+                            y: bounds.y - 5,
+                            width: bounds.width + 10,
+                            height: bounds.height + 10
+                        };
+                        
+                        // Check if mouse is over a resize handle
+                        const handle = getHandleAtPoint(selectionBounds, docPos, zoom);
+                        if (handle) {
+                            // Set cursor based on handle
+                            if (handle === RESIZE_HANDLES.TOP_LEFT || handle === RESIZE_HANDLES.BOTTOM_RIGHT) {
+                                mainCanvas.style.cursor = 'nw-resize';
+                            } else if (handle === RESIZE_HANDLES.TOP_RIGHT || handle === RESIZE_HANDLES.BOTTOM_LEFT) {
+                                mainCanvas.style.cursor = 'ne-resize';
+                            } else if (handle === RESIZE_HANDLES.TOP || handle === RESIZE_HANDLES.BOTTOM) {
+                                mainCanvas.style.cursor = 'n-resize';
+                            } else if (handle === RESIZE_HANDLES.LEFT || handle === RESIZE_HANDLES.RIGHT) {
+                                mainCanvas.style.cursor = 'e-resize';
+                            }
+                        } else {
+                            // Check if mouse is over the element itself
+                            if (isPointInElement(docPos, element)) {
+                                mainCanvas.style.cursor = 'move';
+                            } else {
+                                // Reset cursor
+                                updateCursor();
+                            }
+                        }
+                    }
+                } else if (element && element.type === 'path') {
+                    // For paths, just check if mouse is over the path
+                    if (isPointInElement(docPos, element)) {
+                        mainCanvas.style.cursor = 'move';
+                    } else {
+                        // Reset cursor
+                        updateCursor();
+                    }
+                }
+            }
+        });
+        
+        // Mouse up event - stop drawing, panning, resizing, or dragging
+        mainCanvas.addEventListener('mouseup', (e) => {
+            if (viewLocked) return;
+            
+            if (e.button === 2) { // Right mouse button
+                isPanning = false;
+                mainCanvas.classList.remove('panning-active');
+            } else if (e.button === 0) { // Left mouse button
+                if (isResizing) {
+                    isResizing = false;
+                    resizeHandle = null;
+                    originalElementBounds = null;
+                    saveState();
+                    updateElementsList();
+                } else if (isDragging) {
+                    isDragging = false;
+                    originalElementPositions = [];
+                    saveState();
+                    updateElementsList();
+                } else if (isSelecting) {
+                    isSelecting = false;
+                    
+                    // Determine which elements are within the selection area
+                    const minX = Math.min(selectionStartX, selectionEndX);
+                    const maxX = Math.max(selectionStartX, selectionEndX);
+                    const minY = Math.min(selectionStartY, selectionEndY);
+                    const maxY = Math.max(selectionStartY, selectionEndY);
+                    
+                    selectedElements = [];
+                    
+                    elements.forEach((element, index) => {
+                        let isSelected = false;
+                        
+                        if (element.type === 'path') {
+                            // Check if any point in the path is within the selection area
+                            for (const point of element.points) {
+                                if (point.x >= minX && point.x <= maxX && 
+                                    point.y >= minY && point.y <= maxY) {
+                                    isSelected = true;
+                                    break;
+                                }
+                            }
+                        } else if (element.type === 'rectangle') {
+                            const x = Math.min(element.startX, element.endX);
+                            const y = Math.min(element.startY, element.endY);
+                            const width = Math.abs(element.endX - element.startX);
+                            const height = Math.abs(element.endY - element.startY);
+                            
+                            // Check if rectangle overlaps with selection area
+                            if (!(x + width < minX || x > maxX || y + height < minY || y > maxY)) {
+                                isSelected = true;
+                            }
+                        } else if (element.type === 'circle') {
+                            const centerX = (element.startX + element.endX) / 2;
+                            const centerY = (element.startY + element.endY) / 2;
+                            const radiusX = Math.abs(element.endX - element.startX) / 2;
+                            const radiusY = Math.abs(element.endY - element.startY) / 2;
+                            
+                            // Simple check if circle center is within selection area
+                            if (centerX >= minX && centerX <= maxX && 
+                                centerY >= minY && centerY <= maxY) {
+                                isSelected = true;
+                            }
+                        } else if (element.type === 'text') {
+                            // Simple check if text position is within selection area
+                            if (element.x >= minX && element.x <= maxX && 
+                                element.y >= minY && element.y <= maxY) {
+                                isSelected = true;
+                            }
+                        }
+                        
+                        if (isSelected) {
+                            selectedElements.push(index);
+                        }
+                    });
+                    
+                    updateElementsList();
+                    redrawCanvas();
+                } else if (isDrawing) {
+                    isDrawing = false;
+                    saveState();
+                    updateElementsList();
+                }
+            }
+        });
+        
+        // Mouse leave event - stop drawing, panning, resizing, or dragging
+        mainCanvas.addEventListener('mouseleave', () => {
+            if (viewLocked) return;
+            
+            isPanning = false;
+            isDrawing = false;
+            isSelecting = false;
+            isResizing = false;
+            isDragging = false;
+            resizeHandle = null;
+            originalElementBounds = null;
+            originalElementPositions = [];
+            mainCanvas.classList.remove('panning-active');
+        });
+        
+        // Update elements list in the UI
+        function updateElementsList() {
+            const elementsList = document.getElementById('document-elements');
+            elementsList.innerHTML = '';
+            
+            if (elements.length === 0) {
+                const emptyMessage = document.createElement('li');
+                emptyMessage.className = 'empty-state';
+                emptyMessage.textContent = 'No elements yet. Start drawing to create elements.';
+                elementsList.appendChild(emptyMessage);
+                return;
+            }
+            
+            elements.forEach((element, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'element-item';
+                
+                // Add selected class if element is selected
+                if (selectedElements.includes(index)) {
+                    listItem.classList.add('selected');
+                }
+                
+                let elementName = '';
+                switch (element.type) {
+                    case 'path':
+                        elementName = currentTool === 'eraser' ? 'Eraser Stroke' : 'Brush Stroke';
+                        break;
+                    case 'rectangle':
+                        elementName = 'Rectangle';
+                        break;
+                    case 'circle':
+                        elementName = element.shapeType === 'Ellipse' ? 'Ellipse' : 'Circle';
+                        break;
+                    case 'text':
+                        elementName = `Text: "${element.text}"`;
+                        break;
+                }
+                
+                listItem.textContent = elementName;
+                listItem.addEventListener('click', () => {
+                    // Toggle selection
+                    const selectedIndex = selectedElements.indexOf(index);
+                    if (selectedIndex === -1) {
+                        selectedElements.push(index);
+                        listItem.classList.add('selected');
+                    } else {
+                        selectedElements.splice(selectedIndex, 1);
+                        listItem.classList.remove('selected');
+                    }
+                    
+                    redrawCanvas();
+                });
+                
+                elementsList.appendChild(listItem);
+            });
+        }
+        
+        // Mouse wheel event - zoom
+        mainCanvas.addEventListener('wheel', (e) => {
+            if (viewLocked) {
+                e.preventDefault();
+                return;
+            }
+            
+            e.preventDefault();
+            
+            // Get mouse position relative to canvas
+            const pos = getMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+            
+            // Determine zoom direction
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * zoomFactor));
+            
+            if (newZoom !== zoom) {
+                // Calculate mouse position in document coordinates
+                const docX = (mouseX - viewX) / zoom;
+                const docY = (mouseY - viewY) / zoom;
+                
+                // Adjust view position to zoom towards mouse position
+                viewX = mouseX - docX * newZoom;
+                viewY = mouseY - docY * newZoom;
+                zoom = newZoom;
+                
+                redrawCanvas();
+            }
+        });
+        
+        // Keyboard event handlers
+        document.addEventListener('keydown', (e) => {
+            if (viewLocked) return;
+            
+            // Check if Ctrl or Command is pressed DURING this key event
+            const isCtrlPressed = e.ctrlKey || e.metaKey;
+            
+            // Handle arrow keys when Ctrl is pressed
+            if (isCtrlPressed) {
+                let panned = false;
+                const panSpeed = 20;
+                
+                switch(e.key) {
+                    case 'ArrowUp':
+                        viewY += panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowDown':
+                        viewY -= panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowLeft':
+                        viewX += panSpeed;
+                        panned = true;
+                        break;
+                    case 'ArrowRight':
+                        viewX -= panSpeed;
+                        panned = true;
+                        break;
+                }
+                
+                if (panned) {
+                    e.preventDefault(); // Prevent default scrolling behavior
+                    e.stopPropagation(); // Stop event propagation
+                    redrawCanvas();
+                }
+            }
+            
+            // Handle zoom with keyboard shortcuts (without Ctrl)
+            if (!isCtrlPressed) {
+                if (e.key === '+' || e.key === '=') {
+                    zoomIn(true);
+                    e.preventDefault();
+                } else if (e.key === '-' || e.key === '_') {
+                    zoomOut(true);
+                    e.preventDefault();
+                } else if (e.key === '5') {
+                    zoomFit();
+                    e.preventDefault();
+                }
+            }
+            
+            // Handle edit shortcuts with Ctrl
+            if (isCtrlPressed) {
+                switch(e.key.toLowerCase()) {
+                    case 'z':
+                        if (e.shiftKey) {
+                            redo(); // Ctrl+Shift+Z for redo
+                        } else {
+                            undo(); // Ctrl+Z for undo
+                        }
+                        e.preventDefault();
+                        break;
+                    case 'y':
+                        redo(); // Ctrl+Y for redo
+                        e.preventDefault();
+                        break;
+                    case 'c':
+                        copySelectedElements(); // Ctrl+C for copy
+                        e.preventDefault();
+                        break;
+                    case 'v':
+                        pasteElements(); // Ctrl+V for paste
+                        e.preventDefault();
+                        break;
+                    case 'd':
+                        duplicateSelectedElements(); // Ctrl+D for duplicate
+                        e.preventDefault();
+                        break;
+                }
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Initialize
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            zoomFit(); // Use zoomFit instead of recenter to ensure the document fits
+            selectToolHandler('select-tool');
+            updateElementsList();
+            
+            // Initialize the undo/redo state
+            updateUndoRedoState();
+            
+            // Save initial state to history
+            saveState();
+        });
+        
+        // Add event listener for right mouse button down to show grab cursor
+        mainCanvas.addEventListener('mousedown', (e) => {
+            if (e.button === 2 && !viewLocked) { // Right mouse button
+                mainCanvas.classList.add('panning');
+            }
+        });
+        
+        // Add event listener for right mouse button up to remove grab cursor
+        mainCanvas.addEventListener('mouseup', (e) => {
+            if (e.button === 2) { // Right mouse button
+                mainCanvas.classList.remove('panning');
+            }
+        });
+        
+        // Add event listener for context menu to remove grab cursor
+        mainCanvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            mainCanvas.classList.remove('panning');
+        });
+    </script>
+</body>
+</html>
