@@ -5,12 +5,13 @@ Features:
 - No Dependencies
 - Shapes (Rectangle, Ellipse, Text)
 - Line
+
+TODO:
+- Multi-line (Ctrl)
 - Path (Free-hand Line)
 - Multi-path (Ctrl)
 - Re-order Objects
 - Groups
-
-TODO:
 - Brush
 - Multi-brush (Ctrl)
 - Edit Line/Path/Brush Edges
