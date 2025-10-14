@@ -5,7 +5,6 @@ Features:
 - No Dependencies
 - Shapes (Rectangle, Ellipse, Text)
 - Line
-- Multi-line (Ctrl)
 - Path (Free-hand Line)
 - Multi-path (Ctrl)
 - Re-order Objects
