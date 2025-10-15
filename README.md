@@ -5,15 +5,15 @@ Features:
 - No Dependencies
 - Shapes (Rectangle, Ellipse, Text)
 - Line
+- Line-rail (Ctrl)
 
 TODO:
-- Multi-line (Ctrl)
 - Path (Free-hand Line)
-- Multi-path (Ctrl)
+- Path-rail (Ctrl)
 - Re-order Objects
 - Groups
 - Brush
-- Multi-brush (Ctrl)
+- Brush-rail (Ctrl)
 - Edit Line/Path/Brush Edges
 - Fill
 - Onion Skin
