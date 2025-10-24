@@ -6,14 +6,14 @@ Features:
 - Shapes (Rectangle, Ellipse, Text)
 - Line
 - Line-rail (Ctrl)
+- Brush
+- Brush-rail (Ctrl)
 
 TODO:
 - Path (Free-hand Line)
 - Path-rail (Ctrl)
 - Re-order Objects
 - Groups
-- Brush
-- Brush-rail (Ctrl)
 - Edit Line/Path/Brush Edges
 - Fill
 - Onion Skin
