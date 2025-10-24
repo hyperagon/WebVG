@@ -8,12 +8,12 @@ Features:
 - Line-rail (Ctrl)
 - Brush
 - Brush-rail (Ctrl)
+- Re-order Objects
+- Groups
 
 TODO:
 - Path (Free-hand Line)
 - Path-rail (Ctrl)
-- Re-order Objects
-- Groups
 - Edit Line/Path/Brush Edges
 - Fill
 - Onion Skin
