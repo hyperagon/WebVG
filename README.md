@@ -1,7 +1,7 @@
 # Torani
-### vecTOR ANImator
+## vecTOR ANImator
 
-An [SVG](https://en.wikipedia.org/wiki/SVG) editor inspired by [Glaxnimate](https://glaxnimate.org/) and the [Wick Editor](https://www.wickeditor.com/#/).
+An [SVG](https://en.wikipedia.org/wiki/SVG) editor inspired by [Glaxnimate](https://glaxnimate.org/), the [Wick Editor](https://www.wickeditor.com/#/), [Krita](https://krita.org/en/) and [Tahoma2D](https://tahoma2d.org/).
 
 Features:
 - Offline
