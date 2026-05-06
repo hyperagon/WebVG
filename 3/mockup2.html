@@ -1,0 +1,965 @@
+<!--
+Build a SVG editor mockup where:
+    - It's a single HTML file without dependencies
+    - There is a TOP menu-bar, CENTER, LEFT, RIGHT and BOTTOM panels.
+    Do not implement them, only include placeholders with a comment describing what it does. EXAMPLE for the Menu, note that you need to implement the CSS:
+        <body>
+        <div id="TOP">
+        /* Top Menu with options to make New documents, Open, Save, Import and Export to either a single frame or an Animation */
+        </div>
+
+Make the following take the whole vertical space
+reduce the LEFT and RIGHT to 24 px width
+Have the RIGHT show a popup with a bigger width on hover
+The TOP must show a menu on hover with suboptions, this mockup must be interactive.
+
+why the status bar, I never mentioned that I wanted anything like that
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebVG -30.2</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --bg-dark: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-hover: #2a2d2e;
+    --bg-active: #37373d;
+    --border: #3c3c3c;
+    --text-dim: #5a5a5a;
+    --text-muted: #9e9e9e;
+    --text-bright: #cccccc;
+    --accent: #e8a634;
+    --accent-hover: #f0b84e;
+    --accent-dim: rgba(232,166,52,0.12);
+    --menu-bg: #2d2d30;
+    --menu-hover: #094771;
+    --scroller: #424242;
+    --scroller-hover: #4f4f4f;
+  }
+
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-dark); color: var(--text-muted); font-size: 12px;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroller); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroller-hover); }
+
+  /* ── Shell ── */
+  #app {
+    display: grid;
+    grid-template-rows: 30px 1fr;
+    grid-template-columns: 24px 1fr 24px;
+    grid-template-areas: "top top top" "left center right";
+    height: 100vh; width: 100vw;
+  }
+
+  #app > section { border: 1px solid var(--border); background: var(--bg-panel); position: relative; }
+
+  /* ── TOP BAR ── */
+  #TOP {
+    grid-area: top; border-top: none; border-left: none; border-right: none;
+    background: var(--bg-panel); display: flex; align-items: stretch; padding: 0; z-index: 1000;
+  }
+
+  .menu-item {
+    position: relative; padding: 0 10px; display: flex; align-items: center;
+    cursor: default; user-select: none; font-size: 12px; color: var(--text-muted);
+    transition: background 0.08s;
+  }
+  .menu-item:hover, .menu-item.open { background: var(--menu-hover); color: var(--text-bright); }
+  .menu-item .material-symbols-outlined { font-size: 15px; margin-right: 4px; }
+
+  /* ── Dropdown Menus ── */
+  .dropdown {
+    position: absolute; top: 100%; left: 0; min-width: 260px;
+    background: var(--menu-bg); border: 1px solid #454545;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0;
+    display: none; z-index: 2000;
+  }
+  .dropdown.show { display: block; }
+
+  .dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 24px 5px 12px; cursor: default; position: relative;
+    color: var(--text-muted); white-space: nowrap; transition: background 0.08s, color 0.08s;
+  }
+  .dd-item:hover { background: var(--menu-hover); color: var(--text-bright); }
+  .dd-item.disabled { color: var(--text-dim); pointer-events: none; }
+  .dd-item .material-symbols-outlined { font-size: 16px; margin-right: 8px; opacity: 0.7; }
+  .dd-item .label { flex: 1; }
+  .dd-item .shortcut { margin-left: 28px; font-size: 11px; color: var(--text-dim); }
+  .dd-item:hover .shortcut { color: var(--text-muted); }
+
+  .dd-sep { height: 1px; background: var(--border); margin: 4px 8px; }
+
+  .dd-item .arrow { font-size: 10px; margin-left: 12px; opacity: 0.5; }
+
+  /* ── Submenu ── */
+  .submenu {
+    position: absolute; left: 100%; top: -4px; min-width: 220px;
+    background: var(--menu-bg); border: 1px solid #454545;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0;
+    display: none; z-index: 2001;
+  }
+  .dd-item:hover > .submenu { display: block; }
+
+  /* ── LEFT TOOLBAR ── */
+  #LEFT {
+    grid-area: left; border-top: none; border-left: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0; gap: 1px; overflow-y: auto; overflow-x: hidden;
+  }
+
+  .tool-btn {
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 3px; position: relative;
+    color: var(--text-dim); transition: all 0.12s; flex-shrink: 0;
+  }
+  .tool-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .tool-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .tool-btn .material-symbols-outlined { font-size: 16px; }
+
+  .tool-sep { width: 16px; height: 1px; background: var(--border); margin: 3px 0; flex-shrink: 0; }
+
+  /* ── Tooltip ── */
+  .tool-btn::after {
+    content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%;
+    transform: translateY(-50%); background: #1f1f1f; color: var(--text-bright);
+    padding: 4px 10px; border-radius: 4px; font-size: 11px; white-space: nowrap;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 500;
+    border: 1px solid #454545; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .tool-btn:hover::after { opacity: 1; }
+
+  /* ── RIGHT PANEL (Collapsed) ── */
+  #RIGHT {
+    grid-area: right; border-top: none; border-right: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0; gap: 2px; cursor: default;
+  }
+
+  .prop-btn {
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; color: var(--text-dim); transition: all 0.12s; cursor: pointer; flex-shrink: 0;
+  }
+  .prop-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .prop-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .prop-btn .material-symbols-outlined { font-size: 16px; }
+
+  /* ── RIGHT FLYOUT ── */
+  #right-flyout {
+    position: fixed; right: 24px; top: 30px; bottom: 0; width: 280px;
+    background: var(--bg-panel); border-left: 1px solid var(--border);
+    box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 900;
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  #right-flyout.show { display: flex; }
+
+  .flyout-header {
+    padding: 8px 12px; font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-dim);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+
+  .flyout-body { flex: 1; overflow-y: auto; padding: 0; }
+
+  /* ── Collapsible Sections ── */
+  .section { border-bottom: 1px solid var(--border); }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px; cursor: pointer; user-select: none;
+    transition: background 0.1s;
+  }
+  .section-head:hover { background: var(--bg-hover); }
+  .section-head .title { font-size: 11px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.3px; }
+  .section-head .chevron { font-size: 16px; color: var(--text-dim); transition: transform 0.2s; }
+  .section.collapsed .section-head .chevron { transform: rotate(-90deg); }
+  .section-body { padding: 6px 12px 10px; display: grid; gap: 6px; }
+  .section.collapsed .section-body { display: none; }
+
+  /* ── Form Controls ── */
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field label { font-size: 10px; color: var(--text-dim); width: 16px; text-align: right; flex-shrink: 0; }
+  .field input[type="number"] {
+    flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright);
+    padding: 3px 6px; border-radius: 3px; font-size: 11px; width: 0; outline: none;
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  .field input[type="number"]:focus { border-color: var(--accent); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+  .color-row { display: flex; gap: 10px; align-items: center; }
+  .color-swatch {
+    width: 24px; height: 24px; border-radius: 4px; border: 2px solid var(--border);
+    cursor: pointer; position: relative; overflow: hidden;
+  }
+  .color-swatch input[type="color"] {
+    position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px);
+    cursor: pointer; border: none; padding: 0;
+  }
+  .color-label { font-size: 11px; color: var(--text-muted); }
+
+  select.field-ctrl {
+    flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright);
+    padding: 3px 6px; border-radius: 3px; font-size: 11px; outline: none; font-family: inherit;
+    cursor: pointer;
+  }
+  select.field-ctrl:focus { border-color: var(--accent); }
+
+  input[type="range"].field-ctrl {
+    flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px;
+  }
+  .range-val { font-size: 10px; color: var(--text-dim); width: 28px; text-align: right; }
+
+  /* ── Gradient Preview ── */
+  .gradient-bar {
+    height: 16px; border-radius: 3px; border: 1px solid var(--border); cursor: pointer;
+  }
+  .gradient-label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+  /* ── Layers Panel ── */
+  .layers-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .layers-header .title { font-size: 11px; font-weight: 600; color: var(--text-bright); }
+  .layers-header .actions { display: flex; gap: 2px; }
+  .layers-header .actions button {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; transition: all 0.1s;
+  }
+  .layers-header .actions button:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .layers-header .actions button .material-symbols-outlined { font-size: 14px; }
+
+  .layers-list { flex: 1; overflow-y: auto; padding: 2px 0; }
+
+  .layer-item {
+    display: flex; align-items: center; gap: 6px; padding: 4px 12px; cursor: default;
+    transition: background 0.08s; user-select: none;
+  }
+  .layer-item:hover { background: var(--bg-hover); }
+  .layer-item.selected { background: var(--accent-dim); }
+  .layer-item .layer-vis, .layer-item .layer-lock {
+    width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); cursor: pointer; border-radius: 2px; transition: color 0.1s;
+  }
+  .layer-item .layer-vis:hover, .layer-item .layer-lock:hover { color: var(--text-bright); }
+  .layer-item .layer-vis .material-symbols-outlined,
+  .layer-item .layer-lock .material-symbols-outlined { font-size: 14px; }
+  .layer-item .layer-vis.off { opacity: 0.3; }
+  .layer-item .layer-lock.locked { color: var(--accent); }
+  .layer-item .layer-color {
+    width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+  }
+  .layer-item .layer-name { flex: 1; font-size: 11px; color: var(--text-muted); }
+  .layer-item.selected .layer-name { color: var(--text-bright); }
+
+  /* ── CENTER CANVAS ── */
+  #CENTER {
+    grid-area: center; border-top: none;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(232,166,52,0.025) 0%, transparent 55%),
+      var(--bg-dark); overflow: hidden;
+  }
+
+  /* Artboard */
+  .artboard {
+    position: absolute; width: 640px; height: 480px;
+    background: #ffffff; box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 4px 40px rgba(0,0,0,0.4);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+  .artboard-label {
+    position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: var(--text-dim); white-space: nowrap;
+  }
+
+  /* Selection Handles */
+  .sel-box {
+    position: absolute; border: 1.5px solid var(--accent); pointer-events: none;
+  }
+  .sel-handle {
+    position: absolute; width: 7px; height: 7px; background: #fff; border: 1.5px solid var(--accent);
+    transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer;
+  }
+  .sel-handle.nw { cursor: nw-resize; } .sel-handle.ne { cursor: ne-resize; }
+  .sel-handle.sw { cursor: sw-resize; } .sel-handle.se { cursor: se-resize; }
+  .sel-handle.n { cursor: n-resize; } .sel-handle.s { cursor: s-resize; }
+  .sel-handle.w { cursor: w-resize; } .sel-handle.e { cursor: e-resize; }
+
+  .sel-rotate-line {
+    position: absolute; left: 50%; top: 0; width: 1px; height: 24px;
+    background: var(--accent); transform: translateX(-50%) translateY(-24px);
+    pointer-events: none;
+  }
+  .sel-rotate-handle {
+    position: absolute; left: 50%; top: 0; width: 9px; height: 9px;
+    background: #fff; border: 1.5px solid var(--accent); border-radius: 50%;
+    transform: translate(-50%, -50%) translateY(-24px); cursor: grab; pointer-events: auto;
+  }
+
+  /* Bezier node half-circles */
+  .bezier-node {
+    position: absolute; width: 5px; height: 5px; background: #fff; border: 1px solid var(--accent);
+    transform: translate(-50%, -50%); pointer-events: auto; cursor: move; border-radius: 50%;
+  }
+  .bezier-handle {
+    position: absolute; width: 5px; height: 5px; border-radius: 50%;
+    border: 1px solid var(--accent); transform: translate(-50%, -50%);
+    pointer-events: auto; cursor: move;
+  }
+  .bezier-handle.left-half { background: linear-gradient(90deg, var(--accent) 50%, transparent 50%); }
+  .bezier-handle.right-half { background: linear-gradient(90deg, transparent 50%, var(--accent) 50%); }
+
+  /* ── Canvas Grid (dots) ── */
+  #canvas-grid {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0.3;
+    background-image: radial-gradient(circle, #444 0.8px, transparent 0.8px);
+    background-size: 20px 20px;
+  }
+
+  /* ── Overlay to close menus ── */
+  #menu-overlay {
+    position: fixed; inset: 0; z-index: 999; display: none;
+  }
+  #menu-overlay.show { display: block; }
+
+  /* ── Focus visible ── */
+  *:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+  /* ── Reduced motion ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="menu-overlay"></div>
+
+<div id="app">
+  <!-- ═══ TOP BAR ═══ -->
+  <section id="TOP" role="menubar" aria-label="Main menu">
+    <!-- File -->
+    <div class="menu-item" data-menu="file" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="material-symbols-outlined">description</span>File
+      <div class="dropdown" id="menu-file" role="menu">
+        <div class="dd-item" data-action="new"><span class="material-symbols-outlined">note_add</span><span class="label">New Document</span><span class="shortcut">Ctrl+N</span></div>
+        <div class="dd-item" data-action="open"><span class="material-symbols-outlined">folder_open</span><span class="label">Open...</span><span class="shortcut">Ctrl+O</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="save"><span class="material-symbols-outlined">save</span><span class="label">Save</span><span class="shortcut">Ctrl+S</span></div>
+        <div class="dd-item" data-action="saveas"><span class="material-symbols-outlined">save_as</span><span class="label">Save As...</span><span class="shortcut">Ctrl+Shift+S</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="import">
+          <span class="material-symbols-outlined">upload_file</span><span class="label">Import</span><span class="arrow">&#9656;</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="import-svg"><span class="material-symbols-outlined">data_object</span><span class="label">SVG File</span></div>
+            <div class="dd-item" data-action="import-img"><span class="material-symbols-outlined">image</span><span class="label">Raster Image</span></div>
+            <div class="dd-item" data-action="import-font"><span class="material-symbols-outlined">font_download</span><span class="label">Font</span></div>
+          </div>
+        </div>
+        <div class="dd-item" data-action="export">
+          <span class="material-symbols-outlined">download</span><span class="label">Export</span><span class="arrow">&#9656;</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="export-frame">
+              <span class="material-symbols-outlined">crop_square</span><span class="label">Single Frame</span><span class="arrow">&#9656;</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-svg"><span class="label">SVG</span></div>
+                <div class="dd-item" data-action="export-png"><span class="label">PNG</span></div>
+                <div class="dd-item" data-action="export-jpg"><span class="label">JPEG</span></div>
+                <div class="dd-item" data-action="export-bmp"><span class="label">BMP</span></div>
+              </div>
+            </div>
+            <div class="dd-sep"></div>
+            <div class="dd-item" data-action="export-anim">
+              <span class="material-symbols-outlined">animation</span><span class="label">Animation</span><span class="arrow">&#9656;</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-gif"><span class="label">GIF</span></div>
+                <div class="dd-item" data-action="export-css-svg"><span class="label">SVG + CSS Animation</span></div>
+                <div class="dd-item" data-action="export-webm"><span class="label">WEBM</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit -->
+    <div class="menu-item" data-menu="edit" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="material-symbols-outlined">edit</span>Edit
+      <div class="dropdown" id="menu-edit" role="menu">
+        <div class="dd-item disabled"><span class="material-symbols-outlined">undo</span><span class="label">Undo</span><span class="shortcut">Ctrl+Z</span></div>
+        <div class="dd-item disabled"><span class="material-symbols-outlined">redo</span><span class="label">Redo</span><span class="shortcut">Ctrl+Shift+Z</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="cut"><span class="material-symbols-outlined">content_cut</span><span class="label">Cut</span><span class="shortcut">Ctrl+X</span></div>
+        <div class="dd-item" data-action="copy"><span class="material-symbols-outlined">content_copy</span><span class="label">Copy</span><span class="shortcut">Ctrl+C</span></div>
+        <div class="dd-item" data-action="paste"><span class="material-symbols-outlined">content_paste</span><span class="label">Paste</span><span class="shortcut">Ctrl+V</span></div>
+        <div class="dd-item" data-action="duplicate"><span class="material-symbols-outlined">content_copy</span><span class="label">Duplicate</span><span class="shortcut">Ctrl+D</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="delete"><span class="material-symbols-outlined">delete</span><span class="label">Delete</span><span class="shortcut">Del</span></div>
+        <div class="dd-item" data-action="selectall"><span class="material-symbols-outlined">select_all</span><span class="label">Select All</span><span class="shortcut">Ctrl+A</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="preferences"><span class="material-symbols-outlined">settings</span><span class="label">Preferences</span></div>
+      </div>
+    </div>
+
+    <!-- View -->
+    <div class="menu-item" data-menu="view" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="material-symbols-outlined">visibility</span>View
+      <div class="dropdown" id="menu-view" role="menu">
+        <div class="dd-item" data-action="zoom-in"><span class="material-symbols-outlined">zoom_in</span><span class="label">Zoom In</span><span class="shortcut">Ctrl+=</span></div>
+        <div class="dd-item" data-action="zoom-out"><span class="material-symbols-outlined">zoom_out</span><span class="label">Zoom Out</span><span class="shortcut">Ctrl+-</span></div>
+        <div class="dd-item" data-action="zoom-fit"><span class="material-symbols-outlined">fit_screen</span><span class="label">Fit to Screen</span><span class="shortcut">Ctrl+0</span></div>
+        <div class="dd-item" data-action="zoom-100"><span class="label">100%</span><span class="shortcut">Ctrl+1</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-rulers"><span class="material-symbols-outlined">straighten</span><span class="label">Rulers</span><span class="shortcut">Ctrl+R</span></div>
+        <div class="dd-item" data-action="toggle-grid"><span class="material-symbols-outlined">grid_on</span><span class="label">Grid</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="toggle-snap"><span class="material-symbols-outlined">snap_to_grid</span><span class="label">Snap to Grid</span></div>
+        <div class="dd-item" data-action="toggle-snap-obj"><span class="material-symbols-outlined">snap_to_object</span><span class="label">Snap to Objects</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-guides"><span class="material-symbols-outlined">guide</span><span class="label">Guides</span></div>
+      </div>
+    </div>
+
+    <!-- Object -->
+    <div class="menu-item" data-menu="object" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="material-symbols-outlined">layers</span>Object
+      <div class="dropdown" id="menu-object" role="menu">
+        <div class="dd-item" data-action="move-front"><span class="material-symbols-outlined">flip_to_front</span><span class="label">Bring to Front</span><span class="shortcut">Ctrl+Shift+]</span></div>
+        <div class="dd-item" data-action="move-up"><span class="material-symbols-outlined">arrow_upward</span><span class="label">Bring Forward</span><span class="shortcut">Ctrl+]</span></div>
+        <div class="dd-item" data-action="move-down"><span class="material-symbols-outlined">arrow_downward</span><span class="label">Send Backward</span><span class="shortcut">Ctrl+[</span></div>
+        <div class="dd-item" data-action="move-back"><span class="material-symbols-outlined">flip_to_back</span><span class="label">Send to Back</span><span class="shortcut">Ctrl+Shift+[</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="group"><svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="8" cy="10" r="2.5" fill="var(--bg-panel)"/><circle cx="16" cy="14" r="2.5" fill="var(--bg-panel)"/></svg>&nbsp;&nbsp;<span class="label">Group</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="ungroup"><svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/><circle cx="8" cy="10" r="2.5" fill="currentColor"/><circle cx="16" cy="14" r="2.5" fill="currentColor"/></svg>&nbsp;&nbsp;<span class="label">Ungroup</span><span class="shortcut">Ctrl+Shift+G</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="lock"><span class="material-symbols-outlined">lock</span><span class="label">Lock</span><span class="shortcut">Ctrl+L</span></div>
+        <div class="dd-item" data-action="unlock-all"><span class="material-symbols-outlined">lock_open</span><span class="label">Unlock All</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="boolean">
+          <span class="material-symbols-outlined">join_full</span><span class="label">Boolean Operations</span><span class="arrow">&#9656;</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="bool-union"><span class="material-symbols-outlined">join_full</span><span class="label">Union</span></div>
+            <div class="dd-item" data-action="bool-subtract"><span class="material-symbols-outlined">join_left</span><span class="label">Subtract</span></div>
+            <div class="dd-item" data-action="bool-intersect"><span class="material-symbols-outlined">join_inner</span><span class="label">Intersect</span></div>
+            <div class="dd-item" data-action="bool-exclude"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2A10 10 0 0 0 12 22Z" fill="currentColor"/><path d="M12 2A10 10 0 0 1 12 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"/></svg>&nbsp;&nbsp;<span class="label">Exclude</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help -->
+    <div class="menu-item" data-menu="help" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="material-symbols-outlined">help</span>Help
+      <div class="dropdown" id="menu-help" role="menu">
+        <div class="dd-item" data-action="about"><span class="material-symbols-outlined">info</span><span class="label">About SVG Editor</span></div>
+        <div class="dd-item" data-action="shortcuts"><span class="material-symbols-outlined">keyboard</span><span class="label">Keyboard Shortcuts</span><span class="shortcut">Ctrl+K</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="docs"><span class="material-symbols-outlined">menu_book</span><span class="label">Documentation</span></div>
+      </div>
+    </div>
+
+    <!-- Spacer -->
+    <div style="flex:1"></div>
+
+    <!-- Document info -->
+    <div style="display:flex; align-items:center; gap:8px; padding-right:4px; font-size:11px; color:var(--text-dim);">
+      <span>640 × 480</span>
+      <span>|</span>
+      <span>100%</span>
+    </div>
+  </section>
+
+  <!-- ═══ LEFT TOOLBAR ═══ -->
+  <section id="LEFT" role="toolbar" aria-label="Tools">
+    <div class="tool-btn active" data-tool="select" data-tip="Select (V)" title="Select (V)"><span class="material-symbols-outlined">near_me</span></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="move" data-tip="Move" title="Move"><span class="material-symbols-outlined">open_with</span></div>
+    <div class="tool-btn" data-tool="rotate" data-tip="Rotate" title="Rotate"><span class="material-symbols-outlined">rotate_right</span></div>
+    <div class="tool-btn" data-tool="scale" data-tip="Scale" title="Scale"><span class="material-symbols-outlined">zoom_out_map</span></div>
+    <div class="tool-btn" data-tool="skew" data-tip="Skew (hold Ctrl)" title="Skew (hold Ctrl)"><span class="material-symbols-outlined">more_horiz</span></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="rect" data-tip="Rectangle (R)" title="Rectangle (R)"><span class="material-symbols-outlined">rectangle</span></div>
+    <div class="tool-btn" data-tool="ellipse" data-tip="Ellipse (E)" title=Ellipse (E)"><span class="material-symbols-outlined">circle</span></div>
+    <div class="tool-btn" data-tool="polygon" data-tip="Polygon (P)" title="Polygon (P)"><span class="material-symbols-outlined">hexagon</span></div>
+    <div class="tool-btn" data-tool="line" data-tip="Line (L)" title="Line (L)"><span class="material-symbols-outlined">pen_size_1</span></div>
+    <div class="tool-btn" data-tool="freehand" data-tip="Path (W)" title="Path (W)"><span class="material-symbols-outlined">gesture</span></div>
+    <div class="tool-btn" data-tool="pen" data-tip="Pen (N)" title="Pen"><span class="material-symbols-outlined">edit</span></div>
+    <div class="tool-sep"></div>
+<div class="tool-btn" data-tool="group" data-tip="Group" title="Group"><svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="8" cy="10" r="2.5" fill="var(--bg-panel)"/><circle cx="16" cy="14" r="2.5" fill="var(--bg-panel)"/></svg></div>
+<div class="tool-btn" data-tool="ungroup" data-tip="Ungroup" title="Ungroup"><svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/><circle cx="8" cy="10" r="2.5" fill="currentColor"/><circle cx="16" cy="14" r="2.5" fill="currentColor"/></svg></div>
+    <div class="tool-btn" data-tool="bool-union" data-tip="Union" title="Union"><span class="material-symbols-outlined">join_full</span></div>
+    <div class="tool-btn" data-tool="bool-subtract" data-tip="Subtract" title="Subtract"><span class="material-symbols-outlined">join_left</span></div>
+    <div class="tool-btn" data-tool="bool-intersect" data-tip="Intersect" title="Intersect"><span class="material-symbols-outlined">join_inner</span></div>
+    <div class="tool-btn" data-tool="bool-exclude" data-tip="Exclude" title="Exclude"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2A10 10 0 0 0 12 22Z" fill="currentColor"/><path d="M12 2A10 10 0 0 1 12 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"/></svg></div>
+  </section>
+
+  <!-- ═══ CENTER CANVAS ═══ -->
+  <section id="CENTER" role="main" aria-label="Canvas">
+    <div id="canvas-grid"></div>
+    <div class="artboard" id="artboard">
+      <!-- Demo shapes -->
+      <svg width="640" height="480" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+        <rect x="80" y="100" width="180" height="130" rx="8" fill="#e8a634" opacity="0.85"/>
+        <ellipse cx="420" cy="220" rx="100" ry="80" fill="#3a8fd4" opacity="0.8"/>
+        <polygon points="300,350 370,280 440,350" fill="#5cb85c" opacity="0.75"/>
+        <line x1="100" y1="380" x2="540" y2="380" stroke="#888" stroke-width="1.5" stroke-dasharray="6,4"/>
+      </svg>
+      <!-- Selection overlay on the rect -->
+      <div class="sel-box" style="left:80px; top:100px; width:180px; height:130px;">
+        <div class="sel-rotate-line"></div>
+        <div class="sel-rotate-handle"></div>
+        <div class="sel-handle nw" style="left:0;top:0;"></div>
+        <div class="sel-handle ne" style="left:180px;top:0;"></div>
+        <div class="sel-handle sw" style="left:0;top:130px;"></div>
+        <div class="sel-handle se" style="left:180px;top:130px;"></div>
+        <div class="sel-handle n" style="left:90px;top:0;"></div>
+        <div class="sel-handle s" style="left:90px;top:130px;"></div>
+        <div class="sel-handle w" style="left:0;top:65px;"></div>
+        <div class="sel-handle e" style="left:180px;top:65px;"></div>
+      </div>
+      <!-- Bezier node demo on the rect path -->
+      <div class="bezier-node" style="left:80px;top:100px;"></div>
+      <div class="bezier-handle left-half" style="left:50px;top:80px;" title="Left handle"></div>
+      <div class="bezier-handle right-half" style="left:110px;top:80px;" title="Right handle"></div>
+      <div class="bezier-node" style="left:260px;top:100px;"></div>
+      <div class="bezier-handle left-half" style="left:230px;top:80px;" title="Left handle"></div>
+      <div class="bezier-handle right-half" style="left:290px;top:80px;" title="Right handle"></div>
+      <div class="bezier-node" style="left:260px;top:230px;"></div>
+      <div class="bezier-handle left-half" style="left:290px;top:250px;" title="Left handle"></div>
+      <div class="bezier-handle right-half" style="left:230px;top:250px;" title="Right handle"></div>
+      <div class="bezier-node" style="left:80px;top:230px;"></div>
+      <div class="bezier-handle left-half" style="left:50px;top:250px;" title="Left handle"></div>
+      <div class="bezier-handle right-half" style="left:110px;top:250px;" title="Right handle"></div>
+    </div>
+  </section>
+
+  <!-- ═══ RIGHT PANEL ═══ -->
+  <section id="RIGHT" aria-label="Properties">
+    <div class="prop-btn active" data-panel="options" data-tip="Options"><span class="material-symbols-outlined">tune</span></div>
+    <div class="prop-btn" data-panel="geometry" data-tip="Geometry"><span class="material-symbols-outlined">square_foot</span></div>
+    <div class="prop-btn" data-panel="appearance" data-tip="Appearance"><span class="material-symbols-outlined">opacity</span></div>
+    <div class="prop-btn" data-panel="layers" data-tip="Layers"><span class="material-symbols-outlined">account_tree</span></div>
+  </section>
+</div>
+
+<!-- ═══ RIGHT FLYOUT ═══ -->
+<div id="right-flyout">
+  <div class="flyout-header">Properties</div>
+  <div class="flyout-body" id="flyout-body">
+    <!-- Options Section -->
+    <div class="section" data-section="options">
+      <div class="section-head"><span class="title">Options</span><span class="material-symbols-outlined chevron">expand_more</span></div>
+      <div class="section-body">
+        <div class="color-row">
+          <div class="color-swatch" style="background:#e8a634;"><input type="color" value="#e8a634" aria-label="Fill color"></div>
+          <span class="color-label">Fill</span>
+          <div style="flex:1"></div>
+          <div class="color-swatch" style="background:transparent; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0px;">
+            <input type="color" value="#000000" aria-label="Stroke color">
+          </div>
+          <span class="color-label">Stroke</span>
+        </div>
+        <div class="field">
+          <label>W</label>
+          <input type="number" value="2" min="0" max="100" step="0.5" aria-label="Stroke width">
+        </div>
+        <div class="gradient-bar" style="background: linear-gradient(90deg, #e8a634, #d4782f, #c45e20);" title="Click to edit gradient"></div>
+        <div class="gradient-label">Linear Gradient — click to edit</div>
+      </div>
+    </div>
+
+    <!-- Geometry Section -->
+    <div class="section" data-section="geometry">
+      <div class="section-head"><span class="title">Geometry</span><span class="material-symbols-outlined chevron">expand_more</span></div>
+      <div class="section-body">
+        <div class="field-row">
+          <div class="field"><label>X</label><input type="number" value="80" aria-label="X position"></div>
+          <div class="field"><label>Y</label><input type="number" value="100" aria-label="Y position"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>W</label><input type="number" value="180" aria-label="Width"></div>
+          <div class="field"><label>H</label><input type="number" value="130" aria-label="Height"></div>
+        </div>
+        <div class="field">
+          <label style="font-size:13px;">&#x21BB;</label>
+          <input type="number" value="0" min="-360" max="360" step="1" aria-label="Rotation">
+          <span style="font-size:10px; color:var(--text-dim);">deg</span>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>R</label><input type="number" value="8" min="0" aria-label="Corner radius"></div>
+          <div class="field"><label>S</label><input type="number" value="0" step="1" aria-label="Sides (polygon)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Appearance Section -->
+    <div class="section" data-section="appearance">
+      <div class="section-head"><span class="title">Opacity &amp; Blend</span><span class="material-symbols-outlined chevron">expand_more</span></div>
+      <div class="section-body">
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Opacity</label>
+          <input type="range" class="field-ctrl" min="0" max="100" value="85" aria-label="Opacity">
+          <span class="range-val">85%</span>
+        </div>
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Blend</label>
+          <select class="field-ctrl" aria-label="Blend mode">
+            <option>Normal</option>
+            <option>Multiply</option>
+            <option>Screen</option>
+            <option>Overlay</option>
+            <option>Darken</option>
+            <option>Lighten</option>
+            <option>Color Dodge</option>
+            <option>Color Burn</option>
+            <option>Hard Light</option>
+            <option>Soft Light</option>
+            <option>Difference</option>
+            <option>Exclusion</option>
+            <option>Hue</option>
+            <option>Saturation</option>
+            <option>Color</option>
+            <option>Luminosity</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layers -->
+  <div class="layers-header">
+    <span class="title">Layers</span>
+    <div class="actions">
+      <button title="New Layer" aria-label="New layer"><span class="material-symbols-outlined">add</span></button>
+      <button title="New Folder" aria-label="New folder"><span class="material-symbols-outlined">create_new_folder</span></button>
+      <button title="Delete Layer" aria-label="Delete layer"><span class="material-symbols-outlined">delete</span></button>
+    </div>
+  </div>
+  <div class="layers-list" id="layers-list">
+    <div class="layer-item" data-layer="4">
+      <span class="layer-vis" title="Toggle visibility"><span class="material-symbols-outlined">visibility</span></span>
+      <span class="layer-lock" title="Toggle lock"><span class="material-symbols-outlined">lock_open</span></span>
+      <span class="layer-color" style="background:#888;"></span>
+      <span class="layer-name">Guide Line</span>
+    </div>
+    <div class="layer-item" data-layer="3">
+      <span class="layer-vis" title="Toggle visibility"><span class="material-symbols-outlined">visibility</span></span>
+      <span class="layer-lock" title="Toggle lock"><span class="material-symbols-outlined">lock_open</span></span>
+      <span class="layer-color" style="background:#5cb85c;"></span>
+      <span class="layer-name">Triangle</span>
+    </div>
+    <div class="layer-item" data-layer="2">
+      <span class="layer-vis" title="Toggle visibility"><span class="material-symbols-outlined">visibility</span></span>
+      <span class="layer-lock" title="Toggle lock"><span class="material-symbols-outlined">lock_open</span></span>
+      <span class="layer-color" style="background:#3a8fd4;"></span>
+      <span class="layer-name">Ellipse</span>
+    </div>
+    <div class="layer-item selected" data-layer="1">
+      <span class="layer-vis" title="Toggle visibility"><span class="material-symbols-outlined">visibility</span></span>
+      <span class="layer-lock locked" title="Toggle lock"><span class="material-symbols-outlined">lock</span></span>
+      <span class="layer-color" style="background:#e8a634;"></span>
+      <span class="layer-name">Rectangle</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ═══════════════════════════════════════════
+     Menu System — hover-triggered with click fallback
+     ═══════════════════════════════════════════ */
+  const menuItems = document.querySelectorAll('.menu-item[data-menu]');
+  const overlay = document.getElementById('menu-overlay');
+  let activeMenu = null;
+  let menuTimeout = null;
+
+  function openMenu(item) {
+    closeAllMenus();
+    const dd = item.querySelector('.dropdown');
+    if (!dd) return;
+    dd.classList.add('show');
+    item.classList.add('open');
+    activeMenu = item;
+    overlay.classList.add('show');
+  }
+
+  function closeAllMenus() {
+    clearTimeout(menuTimeout);
+    document.querySelectorAll('.dropdown.show').forEach(d => d.classList.remove('show'));
+    document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+    activeMenu = null;
+    overlay.classList.remove('show');
+  }
+
+  // Click on menu bar item toggles its dropdown
+  menuItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (item.classList.contains('open')) {
+        closeAllMenus();
+      } else {
+        openMenu(item);
+      }
+    });
+  });
+
+  // Hover while a menu is open switches to the hovered menu
+  menuItems.forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      if (activeMenu && activeMenu !== item) {
+        clearTimeout(menuTimeout);
+        openMenu(item);
+      }
+    });
+  });
+
+  // Clicking overlay closes menus
+  overlay.addEventListener('click', closeAllMenus);
+
+  // Menu item actions
+  document.querySelectorAll('.dd-item[data-action]').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const action = item.dataset.action;
+      // Don't close if this item has a submenu (submenu opens on hover)
+      if (item.querySelector('.submenu')) return;
+      closeAllMenus();
+      showToast(action);
+    });
+  });
+
+  /* ═══════════════════════════════════════════
+     Toast Notifications (replaces alert)
+     ═══════════════════════════════════════════ */
+  let toastEl = null;
+  function showToast(action) {
+    if (toastEl) toastEl.remove();
+    toastEl = document.createElement('div');
+    const label = action.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    toastEl.textContent = label;
+    Object.assign(toastEl.style, {
+      position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)',
+      background: '#2d2d30', color: '#ccc', padding: '6px 16px', borderRadius: '6px',
+      fontSize: '12px', border: '1px solid #454545', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+      zIndex: '9999', opacity: '0', transition: 'opacity 0.2s'
+    });
+    document.body.appendChild(toastEl);
+    requestAnimationFrame(() => toastEl.style.opacity = '1');
+    setTimeout(() => {
+      if (toastEl) { toastEl.style.opacity = '0'; setTimeout(() => toastEl && toastEl.remove(), 200); }
+    }, 1800);
+  }
+
+  /* ═══════════════════════════════════════════
+     Tool Selection
+     ═══════════════════════════════════════════ */
+  const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+
+  const toolNames = {
+    select: 'Select', move: 'Move', rotate: 'Rotate', scale: 'Scale', skew: 'Skew',
+    rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', line: 'Line',
+    freehand: 'Freehand Path', pen: 'Pen Tool',
+    'bool-union': 'Boolean Union', 'bool-subtract': 'Boolean Subtract',
+    'bool-intersect': 'Boolean Intersect', 'bool-exclude': 'Boolean Exclude'
+  };
+
+  toolBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      toolBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tool = btn.dataset.tool;
+    });
+  });
+
+  // Keyboard shortcuts for tools
+  const toolKeys = { v: 'select', r: 'rect', e: 'ellipse', p: 'polygon', l: 'line', w: 'freehand', n: 'pen' };
+  document.addEventListener('keydown', (e) => {
+    // Don't trigger if focused on an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    const key = e.key.toLowerCase();
+    if (toolKeys[key]) {
+      const btn = document.querySelector(`.tool-btn[data-tool="${toolKeys[key]}"]`);
+      if (btn) btn.click();
+    }
+  });
+
+  /* ═══════════════════════════════════════════
+     Right Panel — Flyout on hover
+     ═══════════════════════════════════════════ */
+  const rightPanel = document.getElementById('RIGHT');
+  const flyout = document.getElementById('right-flyout');
+  let flyoutTimeout = null;
+
+  rightPanel.addEventListener('mouseenter', () => {
+    clearTimeout(flyoutTimeout);
+    flyout.classList.add('show');
+  });
+
+  rightPanel.addEventListener('mouseleave', () => {
+    flyoutTimeout = setTimeout(() => {
+      if (!flyout.matches(':hover')) flyout.classList.remove('show');
+    }, 200);
+  });
+
+  flyout.addEventListener('mouseleave', () => {
+    flyoutTimeout = setTimeout(() => {
+      if (!rightPanel.matches(':hover')) flyout.classList.remove('show');
+    }, 200);
+  });
+
+  flyout.addEventListener('mouseenter', () => {
+    clearTimeout(flyoutTimeout);
+  });
+
+  /* ═══════════════════════════════════════════
+     Right Panel — Section Collapse
+     ═══════════════════════════════════════════ */
+  document.querySelectorAll('.section-head').forEach(head => {
+    head.addEventListener('click', () => {
+      head.closest('.section').classList.toggle('collapsed');
+    });
+  });
+
+  /* ═══════════════════════════════════════════
+     Right Panel — Property button highlight
+     ═══════════════════════════════════════════ */
+  const propBtns = document.querySelectorAll('.prop-btn[data-panel]');
+  propBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Toggle active state for visual feedback
+      const section = document.querySelector(`.section[data-section="${btn.dataset.panel}"]`);
+      if (section) {
+        const isCollapsed = section.classList.contains('collapsed');
+        if (isCollapsed) section.classList.remove('collapsed');
+        else section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+  });
+
+  /* ═══════════════════════════════════════════
+     Layers — Visibility & Lock toggles
+     ═══════════════════════════════════════════ */
+  document.querySelectorAll('.layer-vis').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon.textContent === 'visibility') {
+        icon.textContent = 'visibility_off';
+        btn.classList.add('off');
+      } else {
+        icon.textContent = 'visibility';
+        btn.classList.remove('off');
+      }
+    });
+  });
+
+  document.querySelectorAll('.layer-lock').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon.textContent === 'lock_open') {
+        icon.textContent = 'lock';
+        btn.classList.add('locked');
+      } else {
+        icon.textContent = 'lock_open';
+        btn.classList.remove('locked');
+      }
+    });
+  });
+
+  // Layer selection
+  document.querySelectorAll('.layer-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.layer-vis') || e.target.closest('.layer-lock')) return;
+      document.querySelectorAll('.layer-item').forEach(l => l.classList.remove('selected'));
+      item.classList.add('selected');
+    });
+  });
+
+  /* ═══════════════════════════════════════════
+     Opacity slider — live value update
+     ═══════════════════════════════════════════ */
+  const opacitySlider = document.querySelector('input[type="range"]');
+  const opacityVal = document.querySelector('.range-val');
+  if (opacitySlider && opacityVal) {
+    opacitySlider.addEventListener('input', () => {
+      opacityVal.textContent = opacitySlider.value + '%';
+    });
+  }
+
+  /* ═══════════════════════════════════════════
+     Canvas — Track mouse position in status bar
+     ═══════════════════════════════════════════ */
+  const center = document.getElementById('CENTER');
+  const statusPos = document.getElementById('status-pos');
+  center.addEventListener('mousemove', (e) => {
+    const rect = center.getBoundingClientRect();
+    const x = Math.round(e.clientX - rect.left);
+    const y = Math.round(e.clientY - rect.top);
+    statusPos.textContent = `X: ${x}  Y: ${y}`;
+  });
+
+  /* ═══════════════════════════════════════════
+     Drag & Drop file indicator (visual only)
+     ═══════════════════════════════════════════ */
+  let dropIndicator = null;
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (!dropIndicator) {
+      dropIndicator = document.createElement('div');
+      Object.assign(dropIndicator.style, {
+        position: 'fixed', inset: '0', zIndex: '10000',
+        background: 'rgba(232,166,52,0.06)', border: '2px dashed var(--accent)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none', color: 'var(--accent)', fontSize: '16px',
+        fontWeight: '600', letterSpacing: '1px'
+      });
+      dropIndicator.textContent = 'DROP TO OPEN OR IMPORT';
+      document.body.appendChild(dropIndicator);
+    }
+  });
+
+  document.addEventListener('dragleave', (e) => {
+    if (e.relatedTarget === null && dropIndicator) {
+      dropIndicator.remove();
+      dropIndicator = null;
+    }
+  });
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (dropIndicator) { dropIndicator.remove(); dropIndicator = null; }
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const name = files[0].name;
+      const ext = name.split('.').pop().toLowerCase();
+      if (ext === 'svg') showToast('Open SVG: ' + name);
+      else if (['png','jpg','jpeg','gif','bmp','webp'].includes(ext)) showToast('Import Image: ' + name);
+      else showToast('Import File: ' + name);
+    }
+  });
+
+  /* ═══════════════════════════════════════════
+     Color swatch — update swatch background
+     ═══════════════════════════════════════════ */
+  document.querySelectorAll('.color-swatch input[type="color"]').forEach(input => {
+    input.addEventListener('input', () => {
+      input.closest('.color-swatch').style.background = input.value;
+    });
+  });
+
+  /* ═══════════════════════════════════════════
+     Prevent context menu on panels (clean feel)
+     ═══════════════════════════════════════════ */
+  document.getElementById('app').addEventListener('contextmenu', (e) => e.preventDefault());
+</script>
+</body>
+</html>

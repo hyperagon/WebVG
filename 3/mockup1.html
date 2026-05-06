@@ -1,0 +1,198 @@
+<!--
+Make the following take the whole vertical space
+Reduce the LEFT and RIGHT to 24 px width
+Have the RIGHT show a popup with a bigger width on hover
+The TOP must show a menu on hover with suboptions, this mockup must be interactive.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebVG -30.1</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg-dark: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-panel-alt: #2a2d2e;
+    --border: #3c3c3c;
+    --text-dim: #6e6e6e;
+    --text-muted: #858585;
+    --accent: #e8a634;
+    --accent-dim: rgba(232, 166, 52, 0.12);
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-muted);
+  }
+
+  /* ── Main Grid Shell ── */
+  #app {
+    display: grid;
+    grid-template-rows: 36px 1fr 26px;
+    grid-template-columns: 240px 1fr 260px;
+    grid-template-areas:
+      "top    top    top"
+      "left   center right";
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── Panel Base Styles ── */
+  #app > div {
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Subtle inner gradient to give depth */
+  #app > div::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255,255,255,0.012) 0%,
+      transparent 40%,
+      rgba(0,0,0,0.06) 100%
+    );
+    pointer-events: none;
+  }
+
+  .panel-label {
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    user-select: none;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── TOP ── */
+  #TOP {
+    grid-area: top;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    background: var(--bg-panel-alt);
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 0 8px;
+    gap: 2px;
+  }
+
+  /* ── LEFT ── */
+  #LEFT {
+    grid-area: left;
+    border-top: none;
+    border-left: none;
+    flex-direction: column;
+  }
+
+  /* ── CENTER ── */
+  #CENTER {
+    grid-area: center;
+    border-top: none;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(232,166,52,0.03) 0%, transparent 60%),
+      var(--bg-dark);
+  }
+
+  /* ── RIGHT ── */
+  #RIGHT {
+    grid-area: right;
+    border-top: none;
+    border-right: none;
+    flex-direction: column;
+  }
+
+  /* ── BOTTOM ── */
+  #BOTTOM {
+    display:none;
+  }
+
+  /* ── Resize Handle Indicators (decorative) ── */
+  #LEFT::after,
+  #RIGHT::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background 0.2s;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  #LEFT::after {
+    right: -1px;
+  }
+
+  #RIGHT::after {
+    left: -1px;
+  }
+
+  #LEFT:hover::after,
+  #RIGHT:hover::after {
+    background: var(--accent-dim);
+  }
+
+  /* ── Center canvas crosshair hint ── */
+  #CENTER::after {
+    content: '+';
+    position: absolute;
+    font-size: 24px;
+    font-weight: 200;
+    color: rgba(255,255,255,0.06);
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="TOP">
+    <!-- Top Menu with options to make New documents, Open, Save, Import and Export to either a single frame (BMP, PMG, JPEG, SVG) or an Animation (like GIF, SVG with CSS animation, WEBM), Dragging a file to the window Opens or Imports it according to ITS type -->
+    <span class="panel-label">Top Menu</span>
+  </div>
+
+  <div id="LEFT">
+    <!-- Left Toolbar containing tool buttons (Select, Rectangle, Ellipse, Polygon, Line, Freehand Path (Sine Wave button), Pen (click to place node and change bezier curve if held and moved),
+    When a shape is selected it shows its nodes that allow to move and resize it, if Ctrl is held then Skews it
+       selection and transform tools (Move, Rotate, Scale, Skew),
+       and boolean operation buttons (Union, Subtract, Intersect, Exclude) -->
+    <span class="panel-label">Toolbar</span>
+  </div>
+
+  <div id="CENTER">
+    <!-- Main SVG Canvas area with infinite panning and zooming, rulers an be toggled in the Menu and appear along top and left edges,
+       a customizable artboard frame, snap-to-grid and snap-to-object guides,
+       and multi-layer rendering with selection handles on active elements there's an circle on top connected to its bounding box that allows one to rotate it and the shapes nodes can be moved and have two circles representing the curve on each side, these are half-filled to show which side they belong to. -->
+    <span class="panel-label">Canvas</span>
+  </div>
+
+  <div id="RIGHT">
+    <!-- Right Properties Panel split into collapsible sections: Options with color pickers and gradient editors,
+       Geometry with position/size/rotation inputs, Opacity and Blend Mode,
+       and a Layers panel at the bottom showing the element tree with visibility, lock, and reorder controls -->
+    <span class="panel-label">Properties &amp; Layers</span>
+  </div>
+</div>
+</body>
+</html>
