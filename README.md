@@ -16,7 +16,7 @@ TODO:
 - Line-rail (Ctrl)
 - Path (Free-hand Line)
 - Path-rail (Ctrl)
-- Edit Line/Path/Brush Edges
+- Edit Line/Path Edges
 - Fill
 - Onion Skin
 - Animation
