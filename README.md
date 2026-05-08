@@ -17,6 +17,7 @@ TODO:
 - Path (Free-hand Line)
 - Path-rail (Ctrl)
 - Edit Line/Path Edges
+- - Draw insid Element
 - Fill
 - Onion Skin
 - Animation
