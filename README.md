@@ -8,13 +8,12 @@ Features:
 - No Dependencies
 - Shapes (Rectangle, Ellipse, Text)
 - Line
-- Line-rail (Ctrl)
 - Brush
-- Brush-rail (Ctrl)
 - Re-order Objects
-- Groups
 
 TODO:
+- Groups
+- Line-rail (Ctrl)
 - Path (Free-hand Line)
 - Path-rail (Ctrl)
 - Edit Line/Path/Brush Edges
