@@ -1,0 +1,168 @@
+<!--
+moving the pivot post-rotation is moving the rectangle, fix that
+
+can't the rectangle move the pivot despite them both being draggable? give me the whole file
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Synced Pivot Transform</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; color: white; font-family: sans-serif; }
+        canvas { display: block; cursor: crosshair; }
+        .controls { position: absolute; top: 10px; left: 10px; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
+        b { color: #3498db; }
+        .pivot-text { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        Drag <b class="pivot-text">Red Circle</b> to move Pivot (Box stays in place)<br>
+        Drag <b>Blue Rect</b> to move Pivot + Box together<br>
+        Drag <b>Canvas</b> to Rotate
+    </div>
+    <canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let width, height;
+
+// Pivot position in world space
+const pivot = { x: 400, y: 300, radius: 8 };
+
+// Rectangle properties relative to the pivot
+const rect = { offX: -75, offY: -50, w: 150, h: 100, angle: 0 };
+
+let isDraggingRect = false;
+let isDraggingPivot = false;
+let isRotating = false;
+
+// We'll use this to keep track of where the mouse grabbed the object
+let dragOffset = { x: 0, y: 0 };
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    draw();
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+canvas.addEventListener('mousedown', (e) => {
+    const mx = e.clientX;
+    const my = e.clientY;
+
+    // 1. Pivot Hit Detection
+    const distToPivot = Math.hypot(mx - pivot.x, my - pivot.y);
+    if (distToPivot < pivot.radius + 10) {
+        isDraggingPivot = true;
+        // Store mouse offset from pivot center
+        dragOffset.x = mx - pivot.x;
+        dragOffset.y = my - pivot.y;
+        return;
+    }
+
+    // 2. Rect Hit Detection (Inverse Transform)
+    const dx = mx - pivot.x;
+    const dy = my - pivot.y;
+    const cos = Math.cos(-rect.angle);
+    const sin = Math.sin(-rect.angle);
+    
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+
+    if (localX > rect.offX && localX < rect.offX + rect.w && 
+        localY > rect.offY && localY < rect.offY + rect.h) {
+        isDraggingRect = true;
+        // Store where on the rectangle we clicked in WORLD space relative to the PIVOT
+        dragOffset.x = mx - pivot.x;
+        dragOffset.y = my - pivot.y;
+        return;
+    }
+
+    // 3. Otherwise, Rotate
+    isRotating = true;
+});
+
+window.addEventListener('mousemove', (e) => {
+    const mx = e.clientX;
+    const my = e.clientY;
+
+    if (isDraggingPivot) {
+        // Capture old world position of the rectangle's center to keep it pinned
+        const oldRectWorld = getRectWorldPos();
+
+        // Move pivot
+        pivot.x = mx - dragOffset.x;
+        pivot.y = my - dragOffset.y;
+
+        // Recalculate rect.offX/offY so the rectangle stays at its world position
+        const dx = oldRectWorld.x - pivot.x;
+        const dy = oldRectWorld.y - pivot.y;
+        const cos = Math.cos(-rect.angle);
+        const sin = Math.sin(-rect.angle);
+        
+        rect.offX = (dx * cos - dy * sin) - rect.w/2;
+        rect.offY = (dx * sin + dy * cos) - rect.h/2;
+
+    } else if (isDraggingRect) {
+        // Moving the Rect moves the Pivot with it
+        pivot.x = mx - dragOffset.x;
+        pivot.y = my - dragOffset.y;
+
+    } else if (isRotating) {
+        rect.angle = Math.atan2(my - pivot.y, mx - pivot.x);
+    }
+    draw();
+});
+
+window.addEventListener('mouseup', () => {
+    isDraggingRect = false;
+    isDraggingPivot = false;
+    isRotating = false;
+});
+
+// Helper to find the center of the rectangle in world space
+function getRectWorldPos() {
+    const cx = rect.offX + rect.w / 2;
+    const cy = rect.offY + rect.h / 2;
+    const cos = Math.cos(rect.angle);
+    const sin = Math.sin(rect.angle);
+    return {
+        x: pivot.x + (cx * cos - cy * sin),
+        y: pivot.y + (cx * sin + cy * cos)
+    };
+}
+
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.translate(pivot.x, pivot.y);
+    ctx.rotate(rect.angle);
+
+    // Draw Rectangle
+    ctx.fillStyle = '#3498db';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(rect.offX, rect.offY, rect.w, rect.h);
+    
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.offX, rect.offY, rect.w, rect.h);
+    ctx.restore();
+
+    // Draw Pivot
+    ctx.beginPath();
+    ctx.arc(pivot.x, pivot.y, pivot.radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.stroke();
+}
+</script>
+</body>
+</html>

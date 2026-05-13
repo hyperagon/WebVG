@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Synced Pivot Transform with Handles</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; color: white; font-family: sans-serif; }
+        canvas { display: block; cursor: crosshair; }
+        .controls { position: absolute; top: 10px; left: 10px; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
+        b { color: #3498db; }
+        .pivot-text { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        Drag <b class="pivot-text">Red Circle</b> to move Pivot (Box stays in place)<br>
+        Drag <b>Blue Rect</b> to move Pivot + Box together<br>
+        Drag <b>Canvas</b> to Rotate<br>
+        Use corner handles to resize (Shift to preserve aspect ratio). Rotation handle above rectangle.
+    </div>
+    <canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let width, height;
+const pivot = { x: 400, y: 300, radius: 8 };
+const rect = { offX: -75, offY: -50, w: 150, h: 100, angle: 0 };
+
+let mode = null; // 'dragPivot','dragRect','rotateCanvas','resize','rotateHandle'
+let dragOffset = { x: 0, y: 0 };
+let activeHandle = null;
+const handleSize = 10;
+const rotHandleDist = 40;
+
+// For smooth rotation: record starting mouse angle and rect.angle at mousedown
+let rotationGrab = { startMouseAngle: 0, startRectAngle: 0 };
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    draw();
+}
+window.addEventListener('resize', resize);
+resize();
+
+function worldToLocal(wx, wy) {
+    const dx = wx - pivot.x;
+    const dy = wy - pivot.y;
+    const cos = Math.cos(-rect.angle);
+    const sin = Math.sin(-rect.angle);
+    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+}
+function localToWorld(lx, ly) {
+    const cos = Math.cos(rect.angle);
+    const sin = Math.sin(rect.angle);
+    return { x: pivot.x + (lx * cos - ly * sin), y: pivot.y + (lx * sin + ly * cos) };
+}
+function getRectWorldCorners() {
+    const corners = [
+        {x: rect.offX,         y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY + rect.h},
+        {x: rect.offX,         y: rect.offY + rect.h}
+    ];
+    return corners.map(c => localToWorld(c.x, c.y));
+}
+function getRectCenterWorld() {
+    return localToWorld(rect.offX + rect.w/2, rect.offY + rect.h/2);
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    const mx = e.clientX, my = e.clientY;
+
+    // Pivot hit
+    const distToPivot = Math.hypot(mx - pivot.x, my - pivot.y);
+    if (distToPivot < pivot.radius + 10) {
+        mode = 'dragPivot';
+        dragOffset.x = mx - pivot.x;
+        dragOffset.y = my - pivot.y;
+        return;
+    }
+
+    // Handles
+    const corners = getRectWorldCorners();
+    for (let i=0;i<4;i++){
+        const c = corners[i];
+        if (Math.abs(mx - c.x) <= handleSize && Math.abs(my - c.y) <= handleSize) {
+            mode = 'resize';
+            activeHandle = i;
+            dragOffset.start = { mx, my };
+            dragOffset.startRect = { offX: rect.offX, offY: rect.offY, w: rect.w, h: rect.h };
+            dragOffset.keepAspect = e.shiftKey;
+            return;
+        }
+    }
+
+    // Rotation handle (above center)
+    const rotHandle = localToWorld(rect.offX + rect.w/2, rect.offY - rotHandleDist);
+    if (Math.hypot(mx - rotHandle.x, my - rotHandle.y) < handleSize*1.2) {
+        mode = 'rotateHandle';
+        rotationGrab.startRectAngle = rect.angle;
+        rotationGrab.startMouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+        return;
+    }
+
+    // Rect hit detection
+    const local = worldToLocal(mx, my);
+    if (local.x > rect.offX && local.x < rect.offX + rect.w &&
+        local.y > rect.offY && local.y < rect.offY + rect.h) {
+        mode = 'dragRect';
+        dragOffset.x = mx - pivot.x;
+        dragOffset.y = my - pivot.y;
+        return;
+    }
+
+    // Otherwise rotate canvas (rotate rect around pivot) — prepare grab data to avoid jump
+    mode = 'rotateCanvas';
+    rotationGrab.startRectAngle = rect.angle;
+    rotationGrab.startMouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+});
+
+window.addEventListener('mousemove', (e) => {
+    const mx = e.clientX, my = e.clientY;
+
+    if (mode === 'dragPivot') {
+        const oldRectCenter = getRectCenterWorld();
+        pivot.x = mx - dragOffset.x;
+        pivot.y = my - dragOffset.y;
+        const dx = oldRectCenter.x - pivot.x;
+        const dy = oldRectCenter.y - pivot.y;
+        const cos = Math.cos(-rect.angle);
+        const sin = Math.sin(-rect.angle);
+        const cx = (dx * cos - dy * sin);
+        const cy = (dx * sin + dy * cos);
+        rect.offX = cx - rect.w/2;
+        rect.offY = cy - rect.h/2;
+
+    } else if (mode === 'dragRect') {
+        pivot.x = mx - dragOffset.x;
+        pivot.y = my - dragOffset.y;
+
+    } else if (mode === 'rotateCanvas') {
+        const mouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+        const delta = mouseAngle - rotationGrab.startMouseAngle;
+        rect.angle = rotationGrab.startRectAngle + delta;
+
+    } else if (mode === 'resize') {
+        const local = worldToLocal(mx, my);
+        const s = dragOffset.startRect;
+        let newOffX = s.offX, newOffY = s.offY, newW = s.w, newH = s.h;
+        const keepAspect = (e.shiftKey) || dragOffset.keepAspect;
+        const aspect = s.w / s.h;
+
+        if (activeHandle === 0) { // TL
+            const x1 = local.x, y1 = local.y;
+            const x2 = s.offX + s.w, y2 = s.offY + s.h;
+            newOffX = Math.min(x1, x2);
+            newOffY = Math.min(y1, y2);
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+                newOffX = x2 - newW;
+                newOffY = y2 - newH;
+            }
+        } else if (activeHandle === 1) { // TR
+            const x1 = s.offX, y1 = local.y, x2 = local.x, y2 = s.offY + s.h;
+            newOffX = x1;
+            newOffY = Math.min(y1, y2);
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+                newOffY = y2 - newH;
+            }
+        } else if (activeHandle === 2) { // BR
+            const x1 = s.offX, y1 = s.offY, x2 = local.x, y2 = local.y;
+            newOffX = Math.min(x1, x2);
+            newOffY = Math.min(y1, y2);
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+            }
+        } else if (activeHandle === 3) { // BL
+            const x1 = local.x, y1 = s.offY, x2 = s.offX + s.w, y2 = local.y;
+            newOffX = Math.min(x1, x2);
+            newOffY = y1;
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+                newOffX = x2 - newW;
+            }
+        }
+
+        newW = Math.max(6, newW);
+        newH = Math.max(6, newH);
+        rect.offX = newOffX;
+        rect.offY = newOffY;
+        rect.w = newW;
+        rect.h = newH;
+
+    } else if (mode === 'rotateHandle') {
+        const mouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+        const delta = mouseAngle - rotationGrab.startMouseAngle;
+        rect.angle = rotationGrab.startRectAngle + delta;
+    }
+
+    draw();
+});
+
+window.addEventListener('mouseup', () => {
+    mode = null;
+    activeHandle = null;
+});
+
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.translate(pivot.x, pivot.y);
+    ctx.rotate(rect.angle);
+
+    ctx.fillStyle = '#3498db';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(rect.offX, rect.offY, rect.w, rect.h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.offX, rect.offY, rect.w, rect.h);
+
+    const handles = [
+        {x: rect.offX,         y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY + rect.h},
+        {x: rect.offX,         y: rect.offY + rect.h}
+    ];
+    ctx.fillStyle = '#ffffff';
+    for (let h of handles) {
+        ctx.fillRect(h.x - handleSize/2, h.y - handleSize/2, handleSize, handleSize);
+    }
+
+    const rotLocalX = rect.offX + rect.w/2;
+    const rotLocalY = rect.offY - rotHandleDist;
+    ctx.beginPath();
+    ctx.fillStyle = '#f1c40f';
+    ctx.arc(rotLocalX, rotLocalY, handleSize/1.2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(rect.offX + rect.w/2, rect.offY + rect.h/2);
+    ctx.lineTo(rotLocalX, rotLocalY);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(pivot.x, pivot.y, pivot.radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.stroke();
+}
+</script>
+</body>
+</html>
