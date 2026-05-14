@@ -1,174 +1,5 @@
 <!--
-    Here's an example on how to make draggable Pivots and Elements (in this case a Rectangle) work now update WebVG to NOT move the Element when dragging its Pivot.
     
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Synced Pivot Transform</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #1a1a1a; color: white; font-family: sans-serif; }
-        canvas { display: block; cursor: crosshair; }
-        .controls { position: absolute; top: 10px; left: 10px; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
-        b { color: #3498db; }
-        .pivot-text { color: #e74c3c; }
-    </style>
-</head>
-<body>
-    <div class="controls">
-        Drag <b class="pivot-text">Red Circle</b> to move Pivot (Box stays in place)<br>
-        Drag <b>Blue Rect</b> to move Pivot + Box together<br>
-        Drag <b>Canvas</b> to Rotate
-    </div>
-    <canvas id="canvas"></canvas>
-
-<script>
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-
-let width, height;
-
-// Pivot position in world space
-const pivot = { x: 400, y: 300, radius: 8 };
-
-// Rectangle properties relative to the pivot
-const rect = { offX: -75, offY: -50, w: 150, h: 100, angle: 0 };
-
-let isDraggingRect = false;
-let isDraggingPivot = false;
-let isRotating = false;
-
-// We'll use this to keep track of where the mouse grabbed the object
-let dragOffset = { x: 0, y: 0 };
-
-function resize() {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
-    draw();
-}
-
-window.addEventListener('resize', resize);
-resize();
-
-canvas.addEventListener('mousedown', (e) => {
-    const mx = e.clientX;
-    const my = e.clientY;
-
-    // 1. Pivot Hit Detection
-    const distToPivot = Math.hypot(mx - pivot.x, my - pivot.y);
-    if (distToPivot < pivot.radius + 10) {
-        isDraggingPivot = true;
-        // Store mouse offset from pivot center
-        dragOffset.x = mx - pivot.x;
-        dragOffset.y = my - pivot.y;
-        return;
-    }
-
-    // 2. Rect Hit Detection (Inverse Transform)
-    const dx = mx - pivot.x;
-    const dy = my - pivot.y;
-    const cos = Math.cos(-rect.angle);
-    const sin = Math.sin(-rect.angle);
-    
-    const localX = dx * cos - dy * sin;
-    const localY = dx * sin + dy * cos;
-
-    if (localX > rect.offX && localX < rect.offX + rect.w && 
-        localY > rect.offY && localY < rect.offY + rect.h) {
-        isDraggingRect = true;
-        // Store where on the rectangle we clicked in WORLD space relative to the PIVOT
-        dragOffset.x = mx - pivot.x;
-        dragOffset.y = my - pivot.y;
-        return;
-    }
-
-    // 3. Otherwise, Rotate
-    isRotating = true;
-});
-
-window.addEventListener('mousemove', (e) => {
-    const mx = e.clientX;
-    const my = e.clientY;
-
-    if (isDraggingPivot) {
-        // Capture old world position of the rectangle's center to keep it pinned
-        const oldRectWorld = getRectWorldPos();
-
-        // Move pivot
-        pivot.x = mx - dragOffset.x;
-        pivot.y = my - dragOffset.y;
-
-        // Recalculate rect.offX/offY so the rectangle stays at its world position
-        const dx = oldRectWorld.x - pivot.x;
-        const dy = oldRectWorld.y - pivot.y;
-        const cos = Math.cos(-rect.angle);
-        const sin = Math.sin(-rect.angle);
-        
-        rect.offX = (dx * cos - dy * sin) - rect.w/2;
-        rect.offY = (dx * sin + dy * cos) - rect.h/2;
-
-    } else if (isDraggingRect) {
-        // Moving the Rect moves the Pivot with it
-        pivot.x = mx - dragOffset.x;
-        pivot.y = my - dragOffset.y;
-
-    } else if (isRotating) {
-        rect.angle = Math.atan2(my - pivot.y, mx - pivot.x);
-    }
-    draw();
-});
-
-window.addEventListener('mouseup', () => {
-    isDraggingRect = false;
-    isDraggingPivot = false;
-    isRotating = false;
-});
-
-// Helper to find the center of the rectangle in world space
-function getRectWorldPos() {
-    const cx = rect.offX + rect.w / 2;
-    const cy = rect.offY + rect.h / 2;
-    const cos = Math.cos(rect.angle);
-    const sin = Math.sin(rect.angle);
-    return {
-        x: pivot.x + (cx * cos - cy * sin),
-        y: pivot.y + (cx * sin + cy * cos)
-    };
-}
-
-function draw() {
-    ctx.clearRect(0, 0, width, height);
-
-    ctx.save();
-    ctx.translate(pivot.x, pivot.y);
-    ctx.rotate(rect.angle);
-
-    // Draw Rectangle
-    ctx.fillStyle = '#3498db';
-    ctx.globalAlpha = 0.8;
-    ctx.fillRect(rect.offX, rect.offY, rect.w, rect.h);
-    
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(rect.offX, rect.offY, rect.w, rect.h);
-    ctx.restore();
-
-    // Draw Pivot
-    ctx.beginPath();
-    ctx.arc(pivot.x, pivot.y, pivot.radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#e74c3c';
-    ctx.fill();
-    ctx.strokeStyle = 'white';
-    ctx.stroke();
-}
-</script>
-</body>
-</html>
-
-    Human Intervention:
-      - Set .sel-rotate-handle to 10px by 10px
-      
-    that can't be, moving the pivot should not move the element yet it does (getWorldCenter, if (dragMode === 'move-pivot') {, )
     
     Tell me what parts to update.
 -->
@@ -176,7 +7,7 @@ function draw() {
 <html lang="en">
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebVG 3.06</title>
+<title>WebVG 3.08</title>
 <style>
   *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
@@ -908,6 +739,7 @@ getWorldCenter() {
      }
   }
 
+  /* Get the visual bounding box (AABB) accounting for rotation */
   getBounds() {
     if (this.type === 'line') {
       return {
@@ -917,7 +749,7 @@ getWorldCenter() {
         h: Math.abs(this.y2 - this.y) || 8
       };
     }
-    // Standard bounds
+    // Always return local x, y, w, h
     return { x: this.x, y: this.y, w: this.w, h: this.h };
   }
 }
@@ -1058,8 +890,7 @@ function renderSVG() {
     
     /* --- ROTATION AROUND PIVOT --- */
     if (el.rot) {
-      node.setAttribute('transform-origin', `${el.px}px ${el.py}px`);
-      node.setAttribute('transform', `rotate(${el.rot})`);
+      node.setAttribute('transform', `rotate(${el.rot}, ${el.px}, ${el.py})`);
     }
     /* ----------------------------- */
     
@@ -1089,7 +920,12 @@ function renderSelection() {
     if (!el || !el.visible) continue;
     
     const b = el.getBounds();
-    const bx = b.x, by = b.y, bw = b.w, bh = b.h;
+    // Use raw coords (local bounds) for the selection box logic
+    let bx = el.x, by = el.y, bw = el.w, bh = el.h;
+    if (el.type === 'line') {
+       bx = Math.min(el.x, el.x2); by = Math.min(el.y, el.y2);
+       bw = Math.abs(el.x2 - el.x) || 8; bh = Math.abs(el.y2 - el.y) || 8;
+    }
 
     // 1. Selection Box
     const box = document.createElement('div');
@@ -1212,10 +1048,16 @@ function updateProperties() {
   propStrokew.value = el.strokeW;
   
   const b = el.getBounds();
-  propX.value = Math.round(b.x);
-  propY.value = Math.round(b.y);
-  propW.value = Math.round(b.w);
-  propH.value = Math.round(b.h);
+  // Use raw coords for properties panel
+  let bx = el.x, by = el.y, bw = el.w, bh = el.h;
+  if (el.type === 'line') {
+     bx = Math.min(el.x, el.x2); by = Math.min(el.y, el.y2);
+     bw = Math.abs(el.x2 - el.x) || 8; bh = Math.abs(el.y2 - el.y) || 8;
+  }
+  propX.value = Math.round(bx);
+  propY.value = Math.round(by);
+  propW.value = Math.round(bw);
+  propH.value = Math.round(bh);
 
   // --- PIVOT INPUTS ---
   const pPx = document.getElementById('prop-px');
@@ -1333,10 +1175,33 @@ function hitTest(mx, my) {
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
     if (!el.visible || el.locked) continue;
-    const b = el.getBounds();
     
-    // Simple bbox check for all types for now
-    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) return el;
+    // For rotated elements, transform mouse point to element's local space
+    if (el.rot) {
+      const rad = -el.rot * Math.PI / 180;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      
+      // Translate mouse to pivot-relative coordinates
+      const relX = mx - el.px;
+      const relY = my - el.py;
+      
+      // Rotate back to unrotated space
+      const localX = relX * cos - relY * sin;
+      const localY = relX * sin + relY * cos;
+      
+      // Now check against local bounds
+      const b = el.getBounds();
+      if (localX >= b.x - el.px && localX <= b.x + b.w - el.px &&
+          localY >= b.y - el.py && localY <= b.y + b.h - el.py) {
+        return el;
+      }
+    } else {
+      // Non-rotated: use simple bbox check
+      const b = el.getBounds();
+      if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+        return el;
+      }
+    }
   }
   return null;
 }
