@@ -1,0 +1,1418 @@
+<!--
+    Turn this mock-up into a fully fledged vector editing application.
+    
+    Here's an example on how to make draggable Pivots and Elements (in this case a Rectangle) work now update WebVG to NOT move the Element when dragging its Pivot.
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Synced Pivot Transform with Handles</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; color: white; font-family: sans-serif; }
+        canvas { display: block; cursor: crosshair; }
+        .controls { position: absolute; top: 10px; left: 10px; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
+        b { color: #3498db; }
+        .pivot-text { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        Drag <b class="pivot-text">Red Circle</b> to move Pivot (Box stays in place)<br>
+        Drag <b>Blue Rect</b> to move Pivot + Box together<br>
+        Drag <b>Canvas</b> to Rotate<br>
+        Use corner handles to resize (Shift to preserve aspect ratio). Rotation handle above rectangle.
+    </div>
+    <canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let width, height;
+const pivot = { x: 400, y: 300, radius: 8 };
+const rect = { offX: -75, offY: -50, w: 150, h: 100, angle: 0 };
+
+let mode = null; // 'dragPivot','dragRect','rotateCanvas','resize','rotateHandle'
+let dragOffset = { x: 0, y: 0 };
+let activeHandle = null;
+const handleSize = 10;
+const rotHandleDist = 40;
+
+// For smooth rotation: record starting mouse angle and rect.angle at mousedown
+let rotationGrab = { startMouseAngle: 0, startRectAngle: 0 };
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    draw();
+}
+window.addEventListener('resize', resize);
+resize();
+
+function worldToLocal(wx, wy) {
+    const dx = wx - pivot.x;
+    const dy = wy - pivot.y;
+    const cos = Math.cos(-rect.angle);
+    const sin = Math.sin(-rect.angle);
+    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+}
+function localToWorld(lx, ly) {
+    const cos = Math.cos(rect.angle);
+    const sin = Math.sin(rect.angle);
+    return { x: pivot.x + (lx * cos - ly * sin), y: pivot.y + (lx * sin + ly * cos) };
+}
+function getRectWorldCorners() {
+    const corners = [
+        {x: rect.offX,         y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY + rect.h},
+        {x: rect.offX,         y: rect.offY + rect.h}
+    ];
+    return corners.map(c => localToWorld(c.x, c.y));
+}
+function getRectCenterWorld() {
+    return localToWorld(rect.offX + rect.w/2, rect.offY + rect.h/2);
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    const mx = e.clientX, my = e.clientY;
+
+    // Pivot hit
+    const distToPivot = Math.hypot(mx - pivot.x, my - pivot.y);
+    if (distToPivot < pivot.radius + 10) {
+        mode = 'dragPivot';
+        dragOffset.x = mx - pivot.x;
+        dragOffset.y = my - pivot.y;
+        return;
+    }
+
+    // Handles
+    const corners = getRectWorldCorners();
+    for (let i=0;i<4;i++){
+        const c = corners[i];
+        if (Math.abs(mx - c.x) <= handleSize && Math.abs(my - c.y) <= handleSize) {
+            mode = 'resize';
+            activeHandle = i;
+            dragOffset.start = { mx, my };
+            dragOffset.startRect = { offX: rect.offX, offY: rect.offY, w: rect.w, h: rect.h };
+            dragOffset.keepAspect = e.shiftKey;
+            return;
+        }
+    }
+
+    // Rotation handle (above center)
+    const rotHandle = localToWorld(rect.offX + rect.w/2, rect.offY - rotHandleDist);
+    if (Math.hypot(mx - rotHandle.x, my - rotHandle.y) < handleSize*1.2) {
+        mode = 'rotateHandle';
+        rotationGrab.startRectAngle = rect.angle;
+        rotationGrab.startMouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+        return;
+    }
+
+    // Rect hit detection
+    const local = worldToLocal(mx, my);
+    if (local.x > rect.offX && local.x < rect.offX + rect.w &&
+        local.y > rect.offY && local.y < rect.offY + rect.h) {
+        mode = 'dragRect';
+        dragOffset.x = mx - pivot.x;
+        dragOffset.y = my - pivot.y;
+        return;
+    }
+
+    // Otherwise rotate canvas (rotate rect around pivot) — prepare grab data to avoid jump
+    mode = 'rotateCanvas';
+    rotationGrab.startRectAngle = rect.angle;
+    rotationGrab.startMouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+});
+
+window.addEventListener('mousemove', (e) => {
+    const mx = e.clientX, my = e.clientY;
+
+    if (mode === 'dragPivot') {
+        const oldRectCenter = getRectCenterWorld();
+        pivot.x = mx - dragOffset.x;
+        pivot.y = my - dragOffset.y;
+        const dx = oldRectCenter.x - pivot.x;
+        const dy = oldRectCenter.y - pivot.y;
+        const cos = Math.cos(-rect.angle);
+        const sin = Math.sin(-rect.angle);
+        const cx = (dx * cos - dy * sin);
+        const cy = (dx * sin + dy * cos);
+        rect.offX = cx - rect.w/2;
+        rect.offY = cy - rect.h/2;
+
+    } else if (mode === 'dragRect') {
+        pivot.x = mx - dragOffset.x;
+        pivot.y = my - dragOffset.y;
+
+    } else if (mode === 'rotateCanvas') {
+        const mouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+        const delta = mouseAngle - rotationGrab.startMouseAngle;
+        rect.angle = rotationGrab.startRectAngle + delta;
+
+    } else if (mode === 'resize') {
+        const local = worldToLocal(mx, my);
+        const s = dragOffset.startRect;
+        let newOffX = s.offX, newOffY = s.offY, newW = s.w, newH = s.h;
+        const keepAspect = (e.shiftKey) || dragOffset.keepAspect;
+        const aspect = s.w / s.h;
+
+        if (activeHandle === 0) { // TL
+            const x1 = local.x, y1 = local.y;
+            const x2 = s.offX + s.w, y2 = s.offY + s.h;
+            newOffX = Math.min(x1, x2);
+            newOffY = Math.min(y1, y2);
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+                newOffX = x2 - newW;
+                newOffY = y2 - newH;
+            }
+        } else if (activeHandle === 1) { // TR
+            const x1 = s.offX, y1 = local.y, x2 = local.x, y2 = s.offY + s.h;
+            newOffX = x1;
+            newOffY = Math.min(y1, y2);
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+                newOffY = y2 - newH;
+            }
+        } else if (activeHandle === 2) { // BR
+            const x1 = s.offX, y1 = s.offY, x2 = local.x, y2 = local.y;
+            newOffX = Math.min(x1, x2);
+            newOffY = Math.min(y1, y2);
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+            }
+        } else if (activeHandle === 3) { // BL
+            const x1 = local.x, y1 = s.offY, x2 = s.offX + s.w, y2 = local.y;
+            newOffX = Math.min(x1, x2);
+            newOffY = y1;
+            newW = Math.abs(x2 - x1);
+            newH = Math.abs(y2 - y1);
+            if (keepAspect) {
+                if (newW / newH > aspect) newW = newH * aspect;
+                else newH = newW / aspect;
+                newOffX = x2 - newW;
+            }
+        }
+
+        newW = Math.max(6, newW);
+        newH = Math.max(6, newH);
+        rect.offX = newOffX;
+        rect.offY = newOffY;
+        rect.w = newW;
+        rect.h = newH;
+
+    } else if (mode === 'rotateHandle') {
+        const mouseAngle = Math.atan2(my - pivot.y, mx - pivot.x);
+        const delta = mouseAngle - rotationGrab.startMouseAngle;
+        rect.angle = rotationGrab.startRectAngle + delta;
+    }
+
+    draw();
+});
+
+window.addEventListener('mouseup', () => {
+    mode = null;
+    activeHandle = null;
+});
+
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.translate(pivot.x, pivot.y);
+    ctx.rotate(rect.angle);
+
+    ctx.fillStyle = '#3498db';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(rect.offX, rect.offY, rect.w, rect.h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.offX, rect.offY, rect.w, rect.h);
+
+    const handles = [
+        {x: rect.offX,         y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY},
+        {x: rect.offX + rect.w,y: rect.offY + rect.h},
+        {x: rect.offX,         y: rect.offY + rect.h}
+    ];
+    ctx.fillStyle = '#ffffff';
+    for (let h of handles) {
+        ctx.fillRect(h.x - handleSize/2, h.y - handleSize/2, handleSize, handleSize);
+    }
+
+    const rotLocalX = rect.offX + rect.w/2;
+    const rotLocalY = rect.offY - rotHandleDist;
+    ctx.beginPath();
+    ctx.fillStyle = '#f1c40f';
+    ctx.arc(rotLocalX, rotLocalY, handleSize/1.2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(rect.offX + rect.w/2, rect.offY + rect.h/2);
+    ctx.lineTo(rotLocalX, rotLocalY);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(pivot.x, pivot.y, pivot.radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.stroke();
+}
+</script>
+</body>
+</html>
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebVG -3.09</title>
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --bg-dark: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-hover: #2a2d2e;
+    --bg-active: #37373d;
+    --border: #3c3c3c;
+    --text-dim: #5a5a5a;
+    --text-muted: #9e9e9e;
+    --text-bright: #cccccc;
+    --accent: #e8a634;
+    --accent-hover: #f0b84e;
+    --accent-dim: rgba(232,166,52,0.12);
+    --menu-bg: #2d2d30;
+    --menu-hover: #094771;
+    --scroller: #424242;
+    --scroller-hover: #4f4f4f;
+  }
+
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-dark); color: var(--text-muted); font-size: 12px;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroller); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroller-hover); }
+
+  #app {
+    display: grid;
+    grid-template-rows: 30px 1fr;
+    grid-template-columns: 24px 1fr 24px;
+    grid-template-areas: "top top top" "left center right";
+    height: 100vh; width: 100vw;
+  }
+
+  #app > section { border: 1px solid var(--border); background: var(--bg-panel); position: relative; }
+
+  /* ── TOP BAR ── */
+  #TOP {
+    grid-area: top; border-top: none; border-left: none; border-right: none;
+    background: var(--bg-panel); display: flex; align-items: stretch; padding: 0; z-index: 1000;
+  }
+
+  .menu-item {
+    position: relative; padding: 0 10px; display: flex; align-items: center;
+    cursor: default; user-select: none; font-size: 12px; color: var(--text-muted);
+    transition: background 0.08s;
+  }
+  .menu-item:hover, .menu-item.open { background: var(--menu-hover); color: var(--text-bright); }
+  .mi-icon { width: 15px; height: 15px; margin-right: 4px; flex-shrink: 0; }
+  .mi-icon svg { width: 100%; height: 100%; display: block; }
+
+  /* ── Dropdown Menus ── */
+  .dropdown {
+    position: absolute; top: 100%; left: 0; min-width: 260px;
+    background: var(--menu-bg); border: 1px solid #454545;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0;
+    display: none; z-index: 2000;
+  }
+  .dropdown.show { display: block; }
+
+  .dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 24px 5px 12px; cursor: default; position: relative;
+    color: var(--text-muted); white-space: nowrap; transition: background 0.08s, color 0.08s;
+  }
+  .dd-item:hover { background: var(--menu-hover); color: var(--text-bright); }
+  .dd-item.disabled { color: var(--text-dim); pointer-events: none; }
+  .dd-icon { width: 16px; height: 16px; margin-right: 8px; opacity: 0.7; flex-shrink: 0; }
+  .dd-icon svg { width: 100%; height: 100%; display: block; }
+  .dd-item .label { flex: 1; }
+  .dd-item .shortcut { margin-left: 28px; font-size: 11px; color: var(--text-dim); }
+  .dd-item:hover .shortcut { color: var(--text-muted); }
+  .dd-sep { height: 1px; background: var(--border); margin: 4px 8px; }
+  .dd-item .arrow { font-size: 10px; margin-left: 12px; opacity: 0.5; }
+
+  .submenu {
+    position: absolute; left: 100%; top: -4px; min-width: 220px;
+    background: var(--menu-bg); border: 1px solid #454545;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0;
+    display: none; z-index: 2001;
+  }
+  .dd-item:hover > .submenu { display: block; }
+
+  /* ── LEFT TOOLBAR ── */
+  #LEFT {
+    grid-area: left; border-top: none; border-left: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0; gap: 1px; overflow-y: auto; overflow-x: hidden;  overflow-y: hidden;
+  }
+
+  .tool-btn {
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 3px; position: relative;
+    color: var(--text-dim); transition: all 0.12s; flex-shrink: 0;
+  }
+  .tool-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .tool-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .tool-btn svg { width: 16px; height: 16px; display: block; }
+
+  .tool-sep { width: 16px; height: 1px; background: var(--border); margin: 3px 0; flex-shrink: 0; }
+
+  .tool-btn::after {
+    content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%;
+    transform: translateY(-50%); background: #1f1f1f; color: var(--text-bright);
+    padding: 4px 10px; border-radius: 4px; font-size: 11px; white-space: nowrap;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 500;
+    border: 1px solid #454545; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .tool-btn:hover::after { opacity: 1; }
+
+  /* ── RIGHT PANEL ── */
+  #RIGHT {
+    grid-area: right; border-top: none; border-right: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0; gap: 2px; cursor: default;
+  }
+
+  .prop-btn {
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; color: var(--text-dim); transition: all 0.12s; cursor: pointer; flex-shrink: 0;
+  }
+  .prop-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .prop-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .prop-btn svg { width: 16px; height: 16px; display: block; }
+
+  /* ── RIGHT FLYOUT ── */
+  #right-flyout {
+    position: fixed; right: 24px; top: 30px; bottom: 0; width: 280px;
+    background: var(--bg-panel); border-left: 1px solid var(--border);
+    box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 900;
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  #right-flyout.show { display: flex; }
+
+  .flyout-header {
+    padding: 8px 12px; font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-dim);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+
+  .flyout-body { flex: 1; overflow-y: auto; padding: 0; }
+
+  .section { border-bottom: 1px solid var(--border); }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px; cursor: pointer; user-select: none; transition: background 0.1s;
+  }
+  .section-head:hover { background: var(--bg-hover); }
+  .section-head .title { font-size: 11px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.3px; }
+  .section-head .chevron { width: 16px; height: 16px; color: var(--text-dim); transition: transform 0.2s; }
+  .section-head .chevron svg { width: 100%; height: 100%; display: block; }
+  .section.collapsed .section-head .chevron { transform: rotate(-90deg); }
+  .section-body { padding: 6px 12px 10px; display: grid; gap: 6px; }
+  .section.collapsed .section-body { display: none; }
+
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field label { font-size: 10px; color: var(--text-dim); width: 16px; text-align: right; flex-shrink: 0; }
+  .field input[type="number"] {
+    flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright);
+    padding: 3px 6px; border-radius: 3px; font-size: 11px; width: 0; outline: none;
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  .field input[type="number"]:focus { border-color: var(--accent); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+  .color-row { display: flex; gap: 10px; align-items: center; }
+  .color-swatch {
+    width: 24px; height: 24px; border-radius: 4px; border: 2px solid var(--border);
+    cursor: pointer; position: relative; overflow: hidden;
+  }
+  .color-swatch input[type="color"] {
+    position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px);
+    cursor: pointer; border: none; padding: 0;
+  }
+  .color-label { font-size: 11px; color: var(--text-muted); }
+
+  select.field-ctrl {
+    flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright);
+    padding: 3px 6px; border-radius: 3px; font-size: 11px; outline: none; font-family: inherit; cursor: pointer;
+  }
+  select.field-ctrl:focus { border-color: var(--accent); }
+
+  input[type="range"].field-ctrl { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
+  .range-val { font-size: 10px; color: var(--text-dim); width: 28px; text-align: right; }
+
+  /* ── Layers Panel ── */
+  .layers-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .layers-header .title { font-size: 11px; font-weight: 600; color: var(--text-bright); }
+  .layers-header .actions { display: flex; gap: 2px; }
+  .layers-header .actions button {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; transition: all 0.1s;
+  }
+  .layers-header .actions button:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .layers-header .actions button svg { width: 14px; height: 14px; display: block; }
+
+  .elem-list { flex: 1; overflow-y: auto; padding: 2px 0; }
+
+  .elem-item {
+    display: flex; align-items: center; gap: 6px; padding: 4px 12px; cursor: default;
+    transition: background 0.08s; user-select: none;
+  }
+  .elem-item:hover { background: var(--bg-hover); }
+  .elem-item.selected { background: var(--accent-dim); }
+  .elem-item .elem-vis, .elem-item .elem-lock {
+    width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); cursor: pointer; border-radius: 2px; transition: color 0.1s;
+  }
+  .elem-item .elem-vis svg, .elem-item .elem-lock svg { width: 14px; height: 14px; display: block; }
+  .elem-item .elem-vis:hover, .elem-item .elem-lock:hover { color: var(--text-bright); }
+  .elem-item .elem-vis.off { opacity: 0.3; }
+  .elem-item .elem-lock.locked { color: var(--accent); }
+  .elem-item .elem-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .elem-item .elem-name { flex: 1; font-size: 11px; color: var(--text-muted); }
+  .elem-item.selected .elem-name { color: var(--text-bright); }
+
+  /* ── CENTER CANVAS ── */
+  #CENTER {
+    grid-area: center; border-top: none;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(232,166,52,0.025) 0%, transparent 55%),
+      var(--bg-dark); overflow: hidden;
+  }
+
+  .artboard {
+    position: absolute; width: 640px; height: 480px;
+    background: #ffffff; box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 4px 40px rgba(0,0,0,0.4);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+  }
+
+  .sel-box { position: absolute; border: 1.5px solid var(--accent); pointer-events: none; }
+  .sel-handle {
+    position: absolute; width: 12px; height: 12px; background: #fff; border: 1.5px solid var(--accent);
+    transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer;
+  }
+  .sel-handle.nw { cursor: nw-resize; } .sel-handle.ne { cursor: ne-resize; }
+  .sel-handle.sw { cursor: sw-resize; } .sel-handle.se { cursor: se-resize; }
+  .sel-handle.n { cursor: n-resize; } .sel-handle.s { cursor: s-resize; }
+  .sel-handle.w { cursor: w-resize; } .sel-handle.e { cursor: e-resize; }
+
+  .sel-rotate-line {
+    position: absolute; left: 50%; top: 0; width: 1px; height: 24px;
+    background: var(--accent); transform: translateX(-50%) translateY(-24px); pointer-events: none;
+  }
+  .sel-rotate-handle {
+    position: absolute; left: 50%; top: 0; width: 12px; height: 12px;
+    background: #fff; border: 1.5px solid var(--accent); border-radius: 50%;
+    transform: translate(-50%, -50%) translateY(-24px); cursor: grab; pointer-events: auto;
+  }
+  .sel-pivot {
+    position: absolute; width: 10px; height: 10px;
+    pointer-events: auto;
+    cursor: crosshair; z-index: 10;
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .sel-pivot-inner {
+    position: absolute; inset: 0; border: 1.5px solid var(--accent);
+    background: rgba(255,255,255,0.85);
+  }
+
+  .bezier-node {
+    position: absolute; width: 5px; height: 5px; background: #fff; border: 1px solid var(--accent);
+    transform: translate(-50%, -50%); pointer-events: auto; cursor: move; border-radius: 50%;
+  }
+  .bezier-handle {
+    position: absolute; width: 5px; height: 5px; border-radius: 50%;
+    border: 1px solid var(--accent); transform: translate(-50%, -50%); pointer-events: auto; cursor: move;
+  }
+  .bezier-handle.left-half { background: linear-gradient(90deg, var(--accent) 50%, transparent 50%); }
+  .bezier-handle.right-half { background: linear-gradient(90deg, transparent 50%, var(--accent) 50%); }
+
+  #canvas-grid {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0.3;
+    background-image: radial-gradient(circle, #444 0.8px, transparent 0.8px);
+    background-size: 20px 20px;
+  }
+
+  #menu-overlay { position: fixed; inset: 0; z-index: 999; display: none; }
+  #menu-overlay.show { display: block; }
+
+  *:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     SVG Icon Library — defined once, reused via <use>
+     ═══════════════════════════════════════════ -->
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden">
+<defs>
+
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-new" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></symbol>
+  <symbol id="i-saveas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4z"/><path d="M15 3v4h4"/><path d="M8 13h8"/><path d="M8 17h5"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+  <symbol id="i-font" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M9.354 4H14.646L20 20H4L9.354 4z"/><line x1="8" y1="20" x2="16" y2="20"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-crop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></symbol>
+<symbol id="i-anim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polygon points="22 12, 17 22, 12 12, 17 2"></polygon>
+  <polyline points="7 22, 2 12, 7 2"></polyline>
+  <polyline points="12 22, 7 12, 12 2"></polyline>
+</symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></symbol>
+  <symbol id="i-cut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-zoomin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></symbol>
+  <symbol id="i-zoomout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0z"/><line x1="14.5" y1="5.5" x2="18.5" y2="9.5"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="4" y1="12" x2="7" y2="12"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+  <symbol id="i-snap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="6.5" cy="6.5" r="1" fill="currentColor"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/><circle cx="17.5" cy="17.5" r="1" fill="currentColor"/><circle cx="6.5" cy="17.5" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-snapobj" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M6.5 3v-1M6.5 8v1M3 6.5H2M8 6.5H9M17.5 3v-1M17.5 8v1M14 6.5h-1M19 6.5h1M17.5 14v-1M17.5 19v1M14 17.5h-1M19 17.5h1M6.5 14v-1M6.5 19v1M3 17.5H2M8 17.5H9"/></symbol>
+  <symbol id="i-guides" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-front" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="14" height="14" rx="2" fill="currentColor"/><rect x="2" y="8" width="14" height="14" rx="2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="14" height="14" rx="2" fill="currentColor"/><rect x="8" y="2" width="14" height="14" rx="2" fill="var(--menu-bg)"/></symbol>
+  <symbol id="i-arrowup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/></symbol>
+  <symbol id="i-arrowdown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" fill="currentColor"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-lockopen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 7 0 0 1 9.9-1"/></symbol>
+  <symbol id="i-union" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="7"/><circle cx="15" cy="12" r="7"/></symbol>
+  <symbol id="i-subtract" viewBox="0 0 24 24" fill="none">
+    <path d="M12 5.68A7 7 0 1 0 12 18.32A7 7 0 0 1 12 5.68Z" fill="currentColor"/>
+    <circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/>
+  </symbol>
+<symbol id="i-intersect" viewBox="0 0 24 24">
+  <!-- Corrected intersection path -->
+  <path d="M12 5.675 A7 7 0 0 0 12 18.325 A7 7 0 0 0 12 5.675 Z" fill="currentColor" stroke="currentColor"/>
+  
+  <circle cx="9" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2" fill="none" style="paint-order: stroke fill;"/>
+  <circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2" fill="none" style="paint-order: stroke fill;"/>
+</symbol>
+  <symbol id="i-exclude" viewBox="0 0 24 24">
+    <path d="M12 5.6754A7 7 0 1 0 12 18.3246A7 7 0 0 1 12 5.6754Z" fill="currentColor"/>
+    <path d="M12 5.6754A7 7 0 1 1 12 18.3246A7 7 0 0 0 12 5.6754Z" fill="currentColor"/>
+    <circle cx="9" cy="12" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/>
+    <circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/>
+  </symbol>
+  <symbol id="i-group" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="8" cy="10" r="2.5" fill="var(--bg-panel)"/><circle cx="16" cy="14" r="2.5" fill="var(--bg-panel)"/></symbol>
+  <symbol id="i-ungroup" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/><circle cx="8" cy="10" r="2.5" fill="currentColor"/><circle cx="16" cy="14" r="2.5" fill="currentColor"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="i-cursor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-6 1-3 6z"/></symbol>
+  <!-- A simple rectangle skewed by a matrix (cos=1, sin=-0.36, etc.) -->
+  <rect x="8" y="4" width="16" height="16" transform="matrix(1, 0, -0.36, 1, 0, 0)" />
+</symbol>
+  <symbol id="i-rect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></symbol>
+  <symbol id="i-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></symbol>
+  <symbol id="i-polyton" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polygon points="12 2 21.5 9 18 21 6 21 2.5 9"/>
+</symbol>
+  <symbol id="i-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M0 12c4-12 8-12 12 0s8 12 12 0"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7H12v-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></symbol>
+<symbol id="i-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 4L4 20"/>
+  <path d="M12 4l8 16"/>
+  <path d="M7.5 14h9"/>
+</symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+  <symbol id="i-geometry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></symbol>
+  <symbol id="i-droplet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-folderplus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></symbol>
+
+</defs>
+</svg>
+
+<div id="menu-overlay"></div>
+
+<div id="app">
+  <!-- ═══ TOP BAR ═══ -->
+  <section id="TOP" role="menubar" aria-label="Main menu">
+    <div class="menu-item" data-menu="file" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-file"/></svg></span>File
+      <div class="dropdown" id="menu-file" role="menu">
+        <div class="dd-item" data-action="new"><span class="dd-icon"><svg><use href="#i-new"/></svg></span><span class="label">New Document</span><span class="shortcut">Ctrl+N</span></div>
+        <div class="dd-item" data-action="open"><span class="dd-icon"><svg><use href="#i-folder"/></svg></span><span class="label">Open...</span><span class="shortcut">Ctrl+O</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="save"><span class="dd-icon"><svg><use href="#i-save"/></svg></span><span class="label">Save</span><span class="shortcut">Ctrl+S</span></div>
+        <div class="dd-item" data-action="saveas"><span class="dd-icon"><svg><use href="#i-saveas"/></svg></span><span class="label">Save As...</span><span class="shortcut">Ctrl+Shift+S</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="import">
+          <span class="dd-icon"><svg><use href="#i-upload"/></svg></span><span class="label">Import</span><span class="arrow">&#9656;</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="import-svg"><span class="dd-icon"><svg><use href="#i-code"/></svg></span><span class="label">SVG File</span></div>
+            <div class="dd-item" data-action="import-img"><span class="dd-icon"><svg><use href="#i-image"/></svg></span><span class="label">Raster Image</span></div>
+          <!--<div class="dd-item" data-action="import-font"><span class="dd-icon"><svg><use href="#i-font"/></svg></span><span class="label">Font</span></div>-->
+          </div>
+        </div>
+        <div class="dd-item" data-action="export">
+          <span class="dd-icon"><svg><use href="#i-download"/></svg></span><span class="label">Export</span><span class="arrow">&#9656;</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="export-frame">
+              <span class="dd-icon"><svg><use href="#i-crop"/></svg></span><span class="label">Single Frame</span><span class="arrow">&#9656;</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-svg"><span class="label">SVG</span></div>
+                <div class="dd-item" data-action="export-bmp"><span class="label">BMP</span></div>
+                <div class="dd-item" data-action="export-png"><span class="label">PNG</span></div>
+                <div class="dd-item" data-action="export-jpg"><span class="label">JPEG</span></div>
+                <div class="dd-item" data-action="export-webp"><span class="label">WebP</span></div>
+              </div>
+            </div>
+            <div class="dd-sep"></div>
+            <div class="dd-item" data-action="export-anim">
+              <span class="dd-icon"><svg><use href="#i-anim"/></svg></span><span class="label">Animation</span><span class="arrow">&#9656;</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-gif"><span class="label">GIF</span></div>
+                <div class="dd-item" data-action="export-smil-svg"><span class="label">SVG + SMIL Animation</span></div>
+                <div class="dd-item" data-action="export-css-svg"><span class="label">SVG + CSS Animation</span></div>
+                <div class="dd-item" data-action="export-webm"><span class="label">RAWR (Glaxnimate)</span></div>
+                <div class="dd-item" data-action="export-webm"><span class="label">WEBM</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="edit" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-edit"/></svg></span>Edit
+      <div class="dropdown" id="menu-edit" role="menu">
+        <div class="dd-item disabled"><span class="dd-icon"><svg><use href="#i-undo"/></svg></span><span class="label">Undo</span><span class="shortcut">Ctrl+Z</span></div>
+        <div class="dd-item disabled"><span class="dd-icon"><svg><use href="#i-redo"/></svg></span><span class="label">Redo</span><span class="shortcut">Ctrl+Shift+Z</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="cut"><span class="dd-icon"><svg><use href="#i-cut"/></svg></span><span class="label">Cut</span><span class="shortcut">Ctrl+X</span></div>
+        <div class="dd-item" data-action="copy"><span class="dd-icon"><svg><use href="#i-copy"/></svg></span><span class="label">Copy</span><span class="shortcut">Ctrl+C</span></div>
+        <div class="dd-item" data-action="paste"><span class="dd-icon"><svg><use href="#i-paste"/></svg></span><span class="label">Paste</span><span class="shortcut">Ctrl+V</span></div>
+        <div class="dd-item" data-action="duplicate"><span class="dd-icon"><svg><use href="#i-copy"/></svg></span><span class="label">Duplicate</span><span class="shortcut">Ctrl+D</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="delete"><span class="dd-icon"><svg><use href="#i-trash"/></svg></span><span class="label">Delete</span><span class="shortcut">Del</span></div>
+        <div class="dd-item" data-action="selectall"><span class="dd-icon"><svg><use href="#i-selectall"/></svg></span><span class="label">Select All</span><span class="shortcut">Ctrl+A</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="preferences"><span class="dd-icon"><svg><use href="#i-settings"/></svg></span><span class="label">Preferences</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="view" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-eye"/></svg></span>View
+      <div class="dropdown" id="menu-view" role="menu">
+        <div class="dd-item" data-action="zoom-in"><span class="dd-icon"><svg><use href="#i-zoomin"/></svg></span><span class="label">Zoom In</span><span class="shortcut">Ctrl++</span></div>
+        <div class="dd-item" data-action="zoom-out"><span class="dd-icon"><svg><use href="#i-zoomout"/></svg></span><span class="label">Zoom Out</span><span class="shortcut">Ctrl+-</span></div>
+        <div class="dd-item" data-action="zoom-fit"><span class="dd-icon"><svg><use href="#i-fit"/></svg></span><span class="label">Fit to Screen</span><span class="dd-icon"><svg><use href="#i-lockopen"/></svg></span><span class="shortcut">Ctrl+5</span></div>
+        <div class="dd-item" data-action="zoom-100"><span class="label">100%</span><span class="dd-icon"><svg><use href="#i-lockopen"/></svg></span><span class="shortcut">Ctrl+1</span></div>
+        <div class="dd-item" data-action="center"><span class="label">Center</span><span class="shortcut">Ctrl+0</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-rulers"><span class="dd-icon"><svg><use href="#i-ruler"/></svg></span><span class="label">Rulers</span><span class="shortcut">Ctrl+R</span></div>
+        <div class="dd-item" data-action="toggle-grid"><span class="dd-icon"><svg><use href="#i-grid"/></svg></span><span class="label">Grid</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="toggle-snap"><span class="dd-icon"><svg><use href="#i-snap"/></svg></span><span class="label">Snap to Grid</span></div>
+        <div class="dd-item" data-action="toggle-snap-obj"><span class="dd-icon"><svg><use href="#i-snapobj"/></svg></span><span class="label">Snap to Elements</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-guides"><span class="dd-icon"><svg><use href="#i-guides"/></svg></span><span class="label">Guides</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="element" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-layers"/></svg></span>Element
+      <div class="dropdown" id="menu-object" role="menu">
+        <div class="dd-item" data-action="move-front"><span class="dd-icon"><svg><use href="#i-front"/></svg></span><span class="label">Bring to Front</span><span class="shortcut">Ctrl+Shift+]</span></div>
+        <div class="dd-item" data-action="move-up"><span class="dd-icon"><svg><use href="#i-arrowup"/></svg></span><span class="label">Bring Forward</span><span class="shortcut">Ctrl+]</span></div>
+        <div class="dd-item" data-action="move-down"><span class="dd-icon"><svg><use href="#i-arrowdown"/></svg></span><span class="label">Send Backward</span><span class="shortcut">Ctrl+[</span></div>
+        <div class="dd-item" data-action="move-back"><span class="dd-icon"><svg><use href="#i-back"/></svg></span><span class="label">Send to Back</span><span class="shortcut">Ctrl+Shift+[</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="group"><span class="dd-icon"><svg><use href="#i-group"/></svg></span><span class="label">Group</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="ungroup"><span class="dd-icon"><svg><use href="#i-ungroup"/></svg></span><span class="label">Ungroup</span><span class="shortcut">Ctrl+Shift+G</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="lock"><span class="dd-icon"><svg><use href="#i-lock"/></svg></span><span class="label">Lock</span><span class="shortcut">Ctrl+L</span></div>
+        <div class="dd-item" data-action="unlock-all"><span class="dd-icon"><svg><use href="#i-lockopen"/></svg></span><span class="label">Unlock</span><span class="shortcut">Ctrl+Shift+L</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="bool-union"><span class="dd-icon"><svg><use href="#i-union"/></svg></span><span class="label">Union</span></div>
+        <div class="dd-item" data-action="bool-exclude"><span class="dd-icon"><svg><use href="#i-subtract"/></svg></span><span class="label">Subtract</span></div>
+        <div class="dd-item" data-action="bool-intersect"><span class="dd-icon"><svg><use href="#i-intersect"/></svg></span><span class="label">Intersect</span></div>
+        <div class="dd-item" data-action="bool-exclude"><span class="dd-icon"><svg><use href="#i-exclude"/></svg></span><span class="label">Exclude</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="help" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-help"/></svg></span>Help
+      <div class="dropdown" id="menu-help" role="menu">
+        <div class="dd-item" data-action="about"><span class="dd-icon"><svg><use href="#i-info"/></svg></span><span class="label">About WebVG</span></div>
+        <div class="dd-item" data-action="shortcuts"><span class="dd-icon"><svg><use href="#i-keyboard"/></svg></span><span class="label">Keyboard Shortcuts</span><span class="shortcut">Ctrl+K</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="docs"><span class="dd-icon"><svg><use href="#i-book"/></svg></span><span class="label">Documentation</span></div>
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div style="display:flex; align-items:center; gap:8px; padding-right:4px; font-size:11px; color:var(--text-dim);">
+      <span>640 × 480</span><span>|</span><span>100%</span>
+    </div>
+  </section>
+
+  <!-- ═══ LEFT TOOLBAR ═══ -->
+  <section id="LEFT" role="toolbar" aria-label="Tools">
+    <div class="tool-btn active" data-tool="select" data-tip="Select (V)" title="Select (V)"><svg><use href="#i-cursor"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="rect" data-tip="Rectangle (R)" title="Rectangle (R)"><svg><use href="#i-rect"/></svg></div>
+    <div class="tool-btn" data-tool="ellipse" data-tip="Ellipse (E)" title="Ellipse (E)"><svg><use href="#i-circle"/></svg></div>
+    <div class="tool-btn" data-tool="polygon" data-tip="Polygon (P)" title="Polygon (P)"><svg><use href="#i-polyton"/></svg></div>
+    <div class="tool-btn" data-tool="line" data-tip="Line (L)" title="Line (L)"><svg><use href="#i-line"/></svg></div>
+    <div class="tool-btn" data-tool="freehand" data-tip="Path (W)" title="Path (W)"><svg><use href="#i-wave"/></svg></div>
+    <div class="tool-btn" data-tool="pen" data-tip="Pen (N)" title="Pen (N)"><svg><use href="#i-pen"/></svg></div>
+    <div class="tool-btn" data-tool="text" data-tip="Text (X)" title="Text (X)"><svg><use href="#i-text"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="group" data-tip="Group" title="Group"><svg><use href="#i-group"/></svg></div>
+    <div class="tool-btn" data-tool="ungroup" data-tip="Ungroup" title="Ungroup"><svg><use href="#i-ungroup"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="lock" data-tip="Lock" title="Lock"><svg><use href="#i-lock"/></svg></div>
+    <div class="tool-btn" data-tool="unlock" data-tip="Unlock" title="Unlock"><svg><use href="#i-lockopen"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="bool-union" data-tip="Union"  title="Union"><svg><use href="#i-union"/></svg></div>
+    <div class="tool-btn" data-tool="bool-subtract" data-tip="Subtract" title="Subtract"><svg><use href="#i-subtract"/></svg></div>
+    <div class="tool-btn" data-tool="bool-intersect" data-tip="Intersect" title="Intersect"><svg><use href="#i-intersect"/></svg></div>
+    <div class="tool-btn" data-tool="bool-exclude" data-tip="Exclude" title="Exclude"><svg><use href="#i-exclude"/></svg></div>
+  </section>
+
+  <!-- ═══ CENTER CANVAS ═══ -->
+  <section id="CENTER" role="main" aria-label="Canvas">
+    <div id="canvas-grid"></div>
+        <div class="artboard" id="artboard">
+      <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+        <rect x="80" y="100" width="180" height="130" rx="8" fill="#e8a634" opacity="0.5"/>
+        <ellipse cx="420" cy="220" rx="100" ry="80" fill="#3a8fd4"/>
+        <polygon points="300,350 370,280 440,350" fill="#5cb85c"/>
+        <line x1="100" y1="380" x2="540" y2="380" stroke="#888" stroke-width="1.5" stroke-dasharray="6,4"/>
+        <path viewBox="20 20 240 240" fill="none" stroke="black" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" d="M220 100c4-12 8-12 120 0s8 120 120 0"/>
+      </svg>
+      <div class="sel-box" style="left:80px; top:100px; width:180px; height:130px;">
+        <div class="sel-rotate-line"></div>
+        <div class="sel-rotate-handle"></div>
+        <div class="sel-handle nw" style="left:0;top:0;"></div>
+        <div class="sel-handle ne" style="left:180px;top:0;"></div>
+        <div class="sel-handle sw" style="left:0;top:130px;"></div>
+        <div class="sel-handle se" style="left:180px;top:130px;"></div>
+        <div class="sel-handle n" style="left:90px;top:0;"></div>
+        <div class="sel-handle s" style="left:90px;top:130px;"></div>
+        <div class="sel-handle w" style="left:0;top:65px;"></div>
+        <div class="sel-handle e" style="left:180px;top:65px;"></div>
+
+      <div class="sel-pivot" style="left: 50%; top: 50%;" data-handle="pivot" title="Drag to move pivot · Double-click to reset"><div class="sel-pivot-h"></div><div class="sel-pivot-v"></div><div class="sel-pivot-inner"></div></div>
+      </div>
+    
+    <!-- Selection Box for Ellipse -->
+    <div class="sel-box" style="left:320px; top:140px; width:200px; height:160px;">
+      <div class="sel-rotate-line"></div>
+      <div class="sel-rotate-handle"></div>
+      <div class="sel-handle nw" style="left:0;top:0;"></div>
+      <div class="sel-handle ne" style="left:200px;top:0;"></div>
+      <div class="sel-handle sw" style="left:0;top:160px;"></div>
+      <div class="sel-handle se" style="left:200px;top:160px;"></div>
+      <div class="sel-handle n" style="left:100px;top:0;"></div>
+      <div class="sel-handle s" style="left:100px;top:160px;"></div>
+      <div class="sel-handle w" style="left:0;top:80px;"></div>
+      <div class="sel-handle e" style="left:200px;top:80px;"></div>
+
+      <div class="sel-pivot" style="left: 50%; top: 50%;" data-handle="pivot" title="Drag to move pivot · Double-click to reset"><div class="sel-pivot-h"></div><div class="sel-pivot-v"></div><div class="sel-pivot-inner"></div></div>
+    </div>
+    
+    <!-- Selection Box for Polygon -->
+    <div class="sel-box" style="left:300px; top:280px; width:140px; height:70px;">
+      <div class="sel-rotate-line"></div>
+      <div class="sel-rotate-handle"></div>
+      <div class="sel-handle nw" style="left:0;top:0;"></div>
+      <div class="sel-handle ne" style="left:140px;top:0;"></div>
+      <div class="sel-handle sw" style="left:0;top:70px;"></div>
+      <div class="sel-handle se" style="left:140px;top:70px;"></div>
+      <div class="sel-handle n" style="left:70px;top:0;"></div>
+      <div class="sel-handle s" style="left:70px;top:70px;"></div>
+      <div class="sel-handle w" style="left:0;top:35px;"></div>
+      <div class="sel-handle e" style="left:140px;top:35px;"></div>
+
+      <div class="sel-pivot" style="left: 50%; top: 50%;" data-handle="pivot" title="Drag to move pivot · Double-click to reset"><div class="sel-pivot-h"></div><div class="sel-pivot-v"></div><div class="sel-pivot-inner"></div></div>
+    </div>
+  </section>
+
+  <!-- ═══ RIGHT PANEL ═══ -->
+  <section id="RIGHT" aria-label="Properties">
+    <div class="prop-btn active" data-panel="options" data-tip="Options"><svg><use href="#i-tune"/></svg></div>
+    <div class="prop-btn" data-panel="geometry" data-tip="Geometry"><svg><use href="#i-geometry"/></svg></div>
+    <div class="prop-btn" data-panel="appearance" data-tip="Appearance"><svg><use href="#i-droplet"/></svg></div>
+    <div class="prop-btn" data-panel="layers" data-tip="Layers"><svg><use href="#i-list"/></svg></div>
+  </section>
+</div>
+
+<!-- ═══ RIGHT FLYOUT ═══ -->
+<div id="right-flyout">
+  <div class="flyout-header">Properties</div>
+  <div class="flyout-body" id="flyout-body">
+    <div class="section" data-section="options">
+      <div class="section-head"><span class="title">Options</span><span class="chevron"><svg><use href="#i-chevron"/></svg></span></div>
+      <div class="section-body">
+        <div class="color-row">
+          <div class="color-swatch"><input type="color" value="#e8a634" aria-label="Fill color"></div>
+          <span class="color-label">Fill</span>
+          <div style="flex:1"></div>
+          <div class="color-swatch">
+            <input type="color" value="#000000" aria-label="Stroke color">
+          </div>
+          <span class="color-label">Stroke</span>
+        </div>
+        <div class="field">
+          <label>S.W.</label>
+          <input type="number" value="2" min="0" max="100" step="0.5" aria-label="Stroke width">
+        </div>
+      </div>
+    </div>
+    <div class="section" data-section="geometry">
+      <div class="section-head"><span class="title">Geometry</span><span class="chevron"><svg><use href="#i-chevron"/></svg></span></div>
+      <div class="section-body">
+        <div class="field-row">
+          <div class="field"><label>X</label><input type="number" value="80" aria-label="X position"></div>
+          <div class="field"><label>Y</label><input type="number" value="100" aria-label="Y position"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>W</label><input type="number" value="180" aria-label="Width"></div>
+          <div class="field"><label>H</label><input type="number" value="130" aria-label="Height"></div>
+        </div>
+        <div class="field">
+          <label style="font-size:13px;">&#x21BB;</label>
+          <input type="number" value="0" min="-360" max="360" step="1" aria-label="Rotation">
+          <span style="font-size:10px; color:var(--text-dim);">deg</span>
+        </div>
+        <div class="field" style="margin-top:2px;">
+          <label style="font-size:10px;width:auto;min-width:24px;">Pivot</label>
+          <div class="field"><label>X</label><input type="number" value="180" aria-label="Width" style="width:30%"></div>
+          <div class="field"><label>Y</label><input type="number" value="130" aria-label="Height" style="width:30%"></div>
+          <button id="btn-reset-pivot" style="background:var(--bg-dark);border:1px solid var(--border);color:var(--text-muted);padding:2px 10px;border-radius:3px;font-size:10px;cursor:pointer;font-family:inherit;transition:color 0.12s;" onmouseover="this.style.color='var(--text-bright)'" onmouseout="this.style.color='var(--text-muted)'" title="Reset pivot to center">Reset</button>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>R</label><input type="number" value="8" min="0" aria-label="Corner radius"></div>
+          <div class="field"><label>S</label><input type="number" value="0" step="1" aria-label="Sides (polygon)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="section" data-section="appearance">
+      <div class="section-head"><span class="title">Opacity &amp; Blend</span><span class="chevron"><svg><use href="#i-chevron"/></svg></span></div>
+      <div class="section-body">
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Fill</label>
+          <input type="range" class="field-ctrl" min="0" max="100" value="85" aria-label="Fill Opacity">
+          <span class="range-val">85%</span>
+        </div>
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Stroke</label>
+          <input type="range" class="field-ctrl" min="0" max="100" value="85" aria-label="Stroke Opacity">
+          <span class="range-val">85%</span>
+        </div>
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Blend</label>
+          <select class="field-ctrl" aria-label="Blend mode">
+            <option>Normal</option><option>Multiply</option><option>Screen</option><option>Overlay</option><option>Darken</option><option>Lighten</option><option>Color Dodge</option><option>Color Burn</option><option>Hard Light</option><option>Soft Light</option><option>Difference</option><option>Exclusion</option><option>Hue</option><option>Saturation</option><option>Color</option><option>Luminosity</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layers-header">
+    <span class="title">Elements</span>
+    <div class="actions">
+      <button title="New Layer" aria-label="New layer"><svg><use href="#i-plus"/></svg></button>
+      <button title="New Folder" aria-label="New folder"><svg><use href="#i-folderplus"/></svg></button>
+      <button title="Delete Layer" aria-label="Delete layer"><svg><use href="#i-trash"/></svg></button>
+    </div>
+  </div>
+  <div class="elem-list" id="elem-list">
+    <div class="elem-item" data-layer="5">
+      <span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"/></svg></span>
+      <span class="elem-lock locked" title="Toggle lock"><svg><use href="#i-lock"/></svg></span>
+      <span class="elem-color" style="background:#800;"></span>
+      <span class="elem-name">Path</span>
+    </div>
+    <div class="elem-item" data-layer="4">
+      <span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"/></svg></span>
+      <span class="elem-lock locked" title="Toggle lock"><svg><use href="#i-lock"/></svg></span>
+      <span class="elem-color" style="background:#888;"></span>
+      <span class="elem-name">Line</span>
+    </div>
+    <div class="elem-item selected" data-layer="3">
+      <span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"/></svg></span>
+      <span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"/></svg></span>
+      <span class="elem-color" style="background:#5cb85c;"></span>
+      <span class="elem-name">Triangle</span>
+    </div>
+    <div class="elem-item selected" data-layer="2">
+      <span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"/></svg></span>
+      <span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"/></svg></span>
+      <span class="elem-color" style="background:#3a8fd4;"></span>
+      <span class="elem-name">Ellipse</span>
+    </div>
+    <div class="elem-item selected" data-layer="1">
+      <span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"/></svg></span>
+      <span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"/></svg></span>
+      <span class="elem-color" style="background:#e8a634;"></span>
+      <span class="elem-name">Rectangle</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ═══ Classes ═══ */
+
+  class Element {
+    constructor(config) {
+      this.id = config.id || 0;
+      this.type = config.type || 'rect';
+      this.name = config.name || 'Element';
+      this.x = config.x || 0;
+      this.y = config.y || 0;
+      this.w = config.w || 0;
+      this.h = config.h || 0;
+      this.x2 = config.x2; // For lines
+      this.y2 = config.y2;
+      this.rot = config.rot || 0;
+      this.visible = config.visible !== false;
+      this.locked = config.locked || false;
+      this.pivotX = config.pivotX !== undefined ? config.pivotX : null;
+      this.pivotY = config.pivotY !== undefined ? config.pivotY : null;
+      
+      // Style
+      this.fill = config.fill || '#e8a634';
+      this.stroke = config.stroke || '#000000';
+      this.strokeW = config.strokeW || 0;
+      this.fillOp = config.fillOp !== undefined ? config.fillOp : 1;
+      this.strokeOp = config.strokeOp !== undefined ? config.strokeOp : 1;
+      this.blend = config.blend || 'Normal';
+      
+      // Type specific
+      this.rx = config.rx || 0;
+      this.ry = config.ry || 0;
+      this.sides = config.sides || 5;
+      this.d = config.d || '';
+      this.textContent = config.textContent || '';
+      this.fontSize = config.fontSize || 16;
+    }
+    
+    getPivot() {
+      if (this.pivotX !== null && this.pivotY !== null) return { x: this.pivotX, y: this.pivotY };
+      const b = this.getBounds();
+      return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    }
+
+    move(dx, dy) {
+      if (this.type === 'line') {
+        this.x += dx; this.y += dy;
+        this.x2 += dx; this.y2 += dy;
+      } else {
+        this.x += dx; this.y += dy;
+      }
+    }
+
+    /* Update bounds based on drag handle */
+    setBounds(handle, orig, dx, dy) {
+      let nx = orig.x, ny = orig.y, nw = orig.w, nh = orig.h;
+      
+      // Only for rect/ellipse/polygon/text
+      if (handle.includes('e')) nw = Math.max(1, orig.w + dx);
+      if (handle.includes('w')) { nx = orig.x + dx; nw = Math.max(1, orig.w - dx); }
+      if (handle.includes('s')) nh = Math.max(1, orig.h + dy);
+      if (handle.includes('n')) { ny = orig.y + dy; nh = Math.max(1, orig.h - dy); }
+
+      this.x = nx; this.y = ny; this.w = nw; this.h = nh;
+    }
+    
+    /* Update geometry during creation */
+    updateDraw(mx, my) {
+       if (this.type === 'line') {
+         this.x2 = mx; this.y2 = my;
+         // Re-calc x,y,w,h for selection box rendering
+         this.x = Math.min(this.x, this.x2);
+         this.y = Math.min(this.y, this.y2);
+         this.w = Math.abs(this.x2 - this.x);
+         this.h = Math.abs(this.y2 - this.y);
+       } else if (this.type === 'freehand') {
+         // Just update bounds for hit testing, path is separate
+         const b = this.getBounds();
+         this.x = b.x; this.y = b.y; this.w = b.w; this.h = b.h;
+       } else {
+         // Rect, Ellipse, Polygon
+         this.w = Math.abs(mx - this.x);
+         this.h = Math.abs(my - this.y);
+         // Normalize so x,y is always top-left
+         if (mx < this.x) this.x = mx;
+         if (my < this.y) this.y = my;
+       }
+    }
+
+    getBounds() {
+      if (this.type === 'line') {
+        return {
+          x: Math.min(this.x, this.x2),
+          y: Math.min(this.y, this.y2),
+          w: Math.abs(this.x2 - this.x) || 8,
+          h: Math.abs(this.y2 - this.y) || 8
+        };
+      }
+      // Standard bounds
+      return { x: this.x, y: this.y, w: this.w, h: this.h };
+    }
+  }
+
+  class Group {
+    constructor(config) {
+      this.id = config.id || 0;
+      this.name = config.name || 'Group';
+      this.visible = config.visible !== false;
+      this.locked = config.locked || false;
+      this.children = [];
+    }
+
+    // Add an Element to the group
+    add(child) {
+      if (child instanceof Element) {
+        this.children.push(child);
+        child.parent = this; // Track parent reference
+        return true;
+      }
+      console.warn("Group.add: Invalid child type. Expected Element.");
+      return false;
+    }
+
+    // Remove an Element from the group
+    remove(child) {
+      try {
+        const index = this.children.indexOf(child);
+        if (index > -1) {
+          this.children.splice(index, 1);
+          delete child.parent; // Clean up parent reference
+          return true;
+        }
+      } catch (error) {
+        console.warn("Tried to Group.remove invalid child.");
+        return false;
+      }
+    }
+
+    // Check if group has children
+    hasChildren() {
+      return this.children.length > 0;
+    }
+
+    // Get count of children
+    getChildCount() {
+      return this.children.length;
+    }
+
+    // Find a child by ID
+    findById(id) {
+      return this.children.find(child => child.id === id) || null;
+    }
+
+    // Find all children matching a predicate
+    findChildren(predicate) {
+      return this.children.filter(predicate);
+    }
+
+    // Apply a function to each child
+    forEachChild(fn) {
+      this.children.forEach(fn);
+    }
+
+    // Check if a specific element is a child
+    contains(element) {
+      return this.children.includes(element);
+    }
+
+    // Clear all children
+    clear() {
+      this.children.forEach(child => delete child.parent);
+      this.children = [];
+    }
+
+    /**
+     * Move all children in the group by (dx, dy)
+     * The group itself doesn't have a position, it just moves its contents.
+     */
+    move(dx, dy) {
+      if (this.locked) return;
+      this.children.forEach(child => {
+        if (typeof child.move === 'function') {
+          child.move(dx, dy);
+        }
+      });
+    }
+
+    /**
+     * Get the combined bounding box of all children in the group.
+     * Returns null if the group is empty.
+     */
+    getBounds() {
+      if (this.children.length === 0) {
+        return null;
+      }
+
+      let minX = Infinity, minY = Infinity;
+      let maxX = -Infinity, maxY = -Infinity;
+
+      this.children.forEach(child => {
+        const b = child.getBounds();
+        if (b) {
+          minX = Math.min(minX, b.x);
+          minY = Math.min(minY, b.y);
+          maxX = Math.max(maxX, b.x + b.w);
+          maxY = Math.max(maxY, b.y + b.h);
+        }
+      });
+
+      return {
+        x: minX,
+        y: minY,
+        w: maxX - minX,
+        h: maxY - minY
+      };
+    }
+
+    /**
+     * Get the center point of the group based on its children's bounds.
+     */
+    getPivot() {
+      const b = this.getBounds();
+      if (!b) return { x: 0, y: 0 };
+      return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    }
+
+    /**
+     * Scale all children relative to the group's pivot point.
+     */
+    scale(sx, sy) {
+      if (this.locked) return;
+      const pivot = this.getPivot();
+      
+      this.children.forEach(child => {
+        // Get child's current pivot (center)
+        const childPivot = child.getPivot ? child.getPivot() : { x: child.x, y: child.y };
+        
+        // Calculate offset from group pivot
+        const dx = childPivot.x - pivot.x;
+        const dy = childPivot.y - pivot.y;
+        
+        // Apply scaling to the child's geometry
+        if (child.type === 'line') {
+          // Scale line endpoints relative to group pivot
+          child.x = pivot.x + (child.x - pivot.x) * sx;
+          child.y = pivot.y + (child.y - pivot.y) * sy;
+          child.x2 = pivot.x + (child.x2 - pivot.x) * sx;
+          child.y2 = pivot.y + (child.y2 - pivot.y) * sy;
+        } else {
+          // Scale position and dimensions
+          child.x = pivot.x + (child.x - pivot.x) * sx;
+          child.y = pivot.y + (child.y - pivot.y) * sy;
+          child.w = child.w * sx;
+          child.h = child.h * sy;
+        }
+      });
+    }
+
+    /**
+     * Rotate all children around the group's pivot point.
+     */
+    rotate(angleDegrees) {
+      if (this.locked) return;
+      const pivot = this.getPivot();
+      const rad = angleDegrees * Math.PI / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      this.children.forEach(child => {
+        const childPivot = child.getPivot ? child.getPivot() : { x: child.x, y: child.y };
+        
+        // Translate to origin (relative to group pivot)
+        let dx = childPivot.x - pivot.x;
+        let dy = childPivot.y - pivot.y;
+
+        // Rotate
+        const newDx = dx * cos - dy * sin;
+        const newDy = dx * sin + dy * cos;
+
+        // Translate back
+        const newX = pivot.x + newDx;
+        const newY = pivot.y + newDy;
+
+        if (child.type === 'line') {
+          // Rotate line endpoints
+          const dx2 = child.x2 - pivot.x;
+          const dy2 = child.y2 - pivot.y;
+          const newDx2 = dx2 * cos - dy2 * sin;
+          const newDy2 = dx2 * sin + dy2 * cos;
+          
+          child.x = pivot.x + newDx;
+          child.y = pivot.y + newDy;
+          child.x2 = pivot.x + newDx2;
+          child.y2 = pivot.y + newDy2;
+        } else {
+          // Move the element's top-left corner
+          // Note: For complex shapes, you might also want to rotate the shape itself (e.g., setting child.rot)
+          child.x = newX;
+          child.y = newY;
+          // Optional: accumulate rotation if the Element supports it
+          if (child.rot !== undefined) {
+            child.rot += angleDegrees;
+          }
+        }
+      });
+    }
+  }
+
+  /* ═══ Menu System ═══ */
+  const menuItems = document.querySelectorAll('.menu-item[data-menu]');
+  const overlay = document.getElementById('menu-overlay');
+  let activeMenu = null, menuTimeout = null;
+
+  function openMenu(item) {
+    closeAllMenus();
+    const dd = item.querySelector('.dropdown');
+    if (!dd) return;
+    dd.classList.add('show');
+    item.classList.add('open');
+    activeMenu = item;
+    overlay.classList.add('show');
+  }
+  function closeAllMenus() {
+    clearTimeout(menuTimeout);
+    document.querySelectorAll('.dropdown.show').forEach(d => d.classList.remove('show'));
+    document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+    activeMenu = null;
+    overlay.classList.remove('show');
+  }
+
+  menuItems.forEach(item => {
+    item.addEventListener('click', e => { e.stopPropagation(); item.classList.contains('open') ? closeAllMenus() : openMenu(item); });
+    item.addEventListener('mouseenter', () => { if (activeMenu && activeMenu !== item) { clearTimeout(menuTimeout); openMenu(item); } });
+  });
+  overlay.addEventListener('click', closeAllMenus);
+  document.querySelectorAll('.dd-item[data-action]').forEach(item => {
+    item.addEventListener('click', e => { e.stopPropagation(); if (item.querySelector('.submenu')) return; closeAllMenus(); showToast(item.dataset.action); });
+  });
+
+  /* ═══ Toast ═══ */
+  let toastEl = null;
+  function showToast(action) {
+    if (toastEl) toastEl.remove();
+    toastEl = document.createElement('div');
+    toastEl.textContent = action.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    Object.assign(toastEl.style, { position:'fixed', bottom:'32px', left:'50%', transform:'translateX(-50%)', background:'#2d2d30', color:'#ccc', padding:'6px 16px', borderRadius:'6px', fontSize:'12px', border:'1px solid #454545', boxShadow:'0 4px 16px rgba(0,0,0,0.4)', zIndex:'9999', opacity:'0', transition:'opacity 0.2s' });
+    document.body.appendChild(toastEl);
+    requestAnimationFrame(() => toastEl.style.opacity = '1');
+    setTimeout(() => { if (toastEl) { toastEl.style.opacity = '0'; setTimeout(() => toastEl && toastEl.remove(), 200); } }, 1800);
+  }
+
+  /* ═══ Tool Selection ═══ */
+  const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+  toolBtns.forEach(btn => { btn.addEventListener('click', () => { toolBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active'); }); });
+  const toolKeys = { v:'select', r:'rect', e:'ellipse', p:'polygon', l:'line', w:'freehand', n:'pen' };
+  document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; const btn = document.querySelector(`.tool-btn[data-tool="${toolKeys[e.key.toLowerCase()]}"]`); if (btn) btn.click(); });
+
+  /* ═══ Right Panel Flyout ═══ */
+  const rightPanel = document.getElementById('RIGHT'), flyout = document.getElementById('right-flyout');
+  let flyoutTimeout = null;
+  rightPanel.addEventListener('mouseenter', () => { clearTimeout(flyoutTimeout); flyout.classList.add('show'); });
+  rightPanel.addEventListener('mouseleave', () => { flyoutTimeout = setTimeout(() => { if (!flyout.matches(':hover')) flyout.classList.remove('show'); }, 200); });
+  flyout.addEventListener('mouseleave', () => { flyoutTimeout = setTimeout(() => { if (!rightPanel.matches(':hover')) flyout.classList.remove('show'); }, 200); });
+  flyout.addEventListener('mouseenter', () => { clearTimeout(flyoutTimeout); });
+
+  /* ═══ Section Collapse ═══ */
+  document.querySelectorAll('.section-head').forEach(head => { head.addEventListener('click', () => head.closest('.section').classList.toggle('collapsed')); });
+
+  /* ═══ Property Buttons ═══ */
+  document.querySelectorAll('.prop-btn[data-panel]').forEach(btn => {
+    btn.addEventListener('click', () => { const s = document.querySelector(`.section[data-section="${btn.dataset.panel}"]`); if (s) { s.classList.contains('collapsed') ? s.classList.remove('collapsed') : s.scrollIntoView({ behavior:'smooth', block:'nearest' }); } });
+  });
+
+  /* ═══ Layer Toggles ═══ */
+  document.querySelectorAll('.elem-vis').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const use = btn.querySelector('use');
+      if (btn.classList.contains('off')) { btn.classList.remove('off'); use.setAttribute('href', '#i-eye'); }
+      else { btn.classList.add('off'); use.setAttribute('href', '#i-eye-off'); }
+    });
+  });
+  document.querySelectorAll('.elem-lock').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const use = btn.querySelector('use');
+      if (btn.classList.contains('locked')) { btn.classList.remove('locked'); use.setAttribute('href', '#i-lockopen'); }
+      else { btn.classList.add('locked'); use.setAttribute('href', '#i-lock'); }
+    });
+  });
+
+  /* ═══ Layer Selection ═══ */
+  document.querySelectorAll('.elem-item').forEach(item => {
+    item.addEventListener('click', e => { if (e.target.closest('.elem-vis') || e.target.closest('.elem-lock')) return; document.querySelectorAll('.elem-item').forEach(l => l.classList.remove('selected')); item.classList.add('selected'); });
+  });
+
+  /* ═══ Opacity Slider ═══ */
+  const opacitySlider = document.querySelector('input[type="range"]'), opacityVal = document.querySelector('.range-val');
+  if (opacitySlider && opacityVal) opacitySlider.addEventListener('input', () => { opacityVal.textContent = opacitySlider.value + '%'; });
+
+  /* ═══ Drag & Drop ═══ */
+  let dropIndicator = null;
+  document.addEventListener('dragover', e => { e.preventDefault(); if (!dropIndicator) { dropIndicator = document.createElement('div'); Object.assign(dropIndicator.style, { position:'fixed', inset:'0', zIndex:'10000', background:'rgba(232,166,52,0.06)', border:'2px dashed var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none', color:'var(--accent)', fontSize:'16px', fontWeight:'600', letterSpacing:'1px' }); dropIndicator.textContent = 'DROP TO OPEN OR IMPORT'; document.body.appendChild(dropIndicator); } });
+  document.addEventListener('dragleave', e => { if (e.relatedTarget === null && dropIndicator) { dropIndicator.remove(); dropIndicator = null; } });
+  document.addEventListener('drop', e => { e.preventDefault(); if (dropIndicator) { dropIndicator.remove(); dropIndicator = null; } const f = e.dataTransfer.files; if (f.length) { const n = f[0].name, x = n.split('.').pop().toLowerCase(); showToast(x === 'svg' ? 'Open SVG: ' + n : ['png','jpg','jpeg','gif','bmp','webp'].includes(x) ? 'Import Image: ' + n : 'Import File: ' + n); } });
+</script>
+</body>
+</html>
