@@ -1,0 +1,2887 @@
+<!--
+    show the Paths pivot so I can drag it, it should behave like it does in Elements and move along but not rotate.
+    
+    I rotate the Path and moving its Pivot moves it... why can't you see how Elements negate the Pivot moving?
+    
+    Moving a Paths pivot should not move the Path itself, it and its anchors must negate the movement.
+      
+    Tell me what parts to update.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebVG 3.26</title>
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --bg-dark: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-hover: #2a2d2e;
+    --bg-active: #37373d;
+    --border: #3c3c3c;
+    --text-dim: #5a5a5a;
+    --text-muted: #9e9e9e;
+    --text-bright: #cccccc;
+    --accent: #e8a634;
+    --accent-hover: #f0b84e;
+    --accent-dim: rgba(232,166,52,0.12);
+    --menu-bg: #2d2d30;
+    --menu-hover: #094771;
+    --scroller: #424242;
+    --scroller-hover: #4f4f4f;
+  }
+
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-dark); color: var(--text-muted); font-size: 12px;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroller); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scroller-hover); }
+
+  #app {
+    display: grid;
+    grid-template-rows: 30px 1fr;
+    grid-template-columns: 24px 1fr 24px;
+    grid-template-areas: "top top top" "left center right";
+    height: 100vh; width: 100vw;
+  }
+
+  #app > section { border: 1px solid var(--border); background: var(--bg-panel); position: relative; }
+
+  #TOP {
+    grid-area: top; border-top: none; border-left: none; border-right: none;
+    background: var(--bg-panel); display: flex; align-items: stretch; padding: 0; z-index: 1000;
+  }
+
+  .menu-item {
+    position: relative; padding: 0 10px; display: flex; align-items: center;
+    cursor: default; user-select: none; font-size: 12px; color: var(--text-muted);
+    transition: background 0.08s;
+  }
+  .menu-item:hover, .menu-item.open { background: var(--menu-hover); color: var(--text-bright); }
+  .mi-icon { width: 15px; height: 15px; margin-right: 4px; flex-shrink: 0; }
+  .mi-icon svg { width: 100%; height: 100%; display: block; }
+
+  .dropdown {
+    position: absolute; top: 100%; left: 0; min-width: 260px;
+    background: var(--menu-bg); border: 1px solid #454545;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0;
+    display: none; z-index: 2000;
+  }
+  .dropdown.show { display: block; }
+
+  .dd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 24px 5px 12px; cursor: default; position: relative;
+    color: var(--text-muted); white-space: nowrap; transition: background 0.08s, color 0.08s;
+  }
+  .dd-item:hover { background: var(--menu-hover); color: var(--text-bright); }
+  .dd-item.disabled { color: var(--text-dim); pointer-events: none; }
+  .dd-icon { width: 16px; height: 16px; margin-right: 8px; opacity: 0.7; flex-shrink: 0; }
+  .dd-icon svg { width: 100%; height: 100%; display: block; }
+  .dd-item .label { flex: 1; }
+  .dd-item .shortcut { margin-left: 28px; font-size: 11px; color: var(--text-dim); }
+  .dd-item:hover .shortcut { color: var(--text-muted); }
+  .dd-sep { height: 1px; background: var(--border); margin: 4px 8px; }
+  .dd-item .arrow { font-size: 10px; margin-left: 12px; opacity: 0.5; }
+
+  .submenu {
+    position: absolute; left: 100%; top: -4px; min-width: 220px;
+    background: var(--menu-bg); border: 1px solid #454545;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0;
+    display: none; z-index: 2001;
+  }
+  .dd-item:hover > .submenu { display: block; }
+
+  #LEFT {
+    grid-area: left; border-top: none; border-left: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0; gap: 1px; overflow-y: auto; overflow-x: hidden;
+  }
+
+  .tool-btn {
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 3px; position: relative;
+    color: var(--text-dim); transition: all 0.12s; flex-shrink: 0;
+  }
+  .tool-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .tool-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .tool-btn svg { width: 16px; height: 16px; display: block; }
+
+  .tool-sep { width: 16px; height: 1px; background: var(--border); margin: 3px 0; flex-shrink: 0; }
+
+  .tool-btn::after {
+    content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%;
+    transform: translateY(-50%); background: #1f1f1f; color: var(--text-bright);
+    padding: 4px 10px; border-radius: 4px; font-size: 11px; white-space: nowrap;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 500;
+    border: 1px solid #454545; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .tool-btn:hover::after { opacity: 1; }
+
+  #RIGHT {
+    grid-area: right; border-top: none; border-right: none;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 4px 0; gap: 2px; cursor: default;
+  }
+
+  .prop-btn {
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; color: var(--text-dim); transition: all 0.12s; cursor: pointer; flex-shrink: 0;
+  }
+  .prop-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .prop-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .prop-btn svg { width: 16px; height: 16px; display: block; }
+
+  #right-flyout {
+    position: fixed; right: 24px; top: 30px; bottom: 0; width: 280px;
+    background: var(--bg-panel); border-left: 1px solid var(--border);
+    box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 900;
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  #right-flyout.show { display: flex; }
+
+  .flyout-header {
+    padding: 8px 12px; font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-dim);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+
+  .flyout-body { flex: 1; overflow-y: auto; padding: 0; }
+
+  .section { border-bottom: 1px solid var(--border); }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px; cursor: pointer; user-select: none; transition: background 0.1s;
+  }
+  .section-head:hover { background: var(--bg-hover); }
+  .section-head .title { font-size: 11px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.3px; }
+  .section-head .chevron { width: 16px; height: 16px; color: var(--text-dim); transition: transform 0.2s; }
+  .section-head .chevron svg { width: 100%; height: 100%; display: block; }
+  .section.collapsed .section-head .chevron { transform: rotate(-90deg); }
+  .section-body { padding: 6px 12px 10px; display: grid; gap: 6px; }
+  .section.collapsed .section-body { display: none; }
+
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field label { font-size: 10px; color: var(--text-dim); width: 16px; text-align: right; flex-shrink: 0; }
+  .field input[type="number"] {
+    flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright);
+    padding: 3px 6px; border-radius: 3px; font-size: 11px; width: 0; outline: none;
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  .field input[type="number"]:focus { border-color: var(--accent); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+  .color-row { display: flex; gap: 10px; align-items: center; }
+  .color-swatch {
+    width: 24px; height: 24px; border-radius: 4px; border: 2px solid var(--border);
+    cursor: pointer; position: relative; overflow: hidden; flex-shrink: 0;
+  }
+  .color-swatch input[type="color"] {
+    position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px);
+    cursor: pointer; border: none; padding: 0;
+  }
+  .color-label { font-size: 11px; color: var(--text-muted); }
+
+  select.field-ctrl {
+    flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright);
+    padding: 3px 6px; border-radius: 3px; font-size: 11px; outline: none; font-family: inherit; cursor: pointer;
+  }
+  select.field-ctrl:focus { border-color: var(--accent); }
+
+  input[type="range"].field-ctrl { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
+  .range-val { font-size: 10px; color: var(--text-dim); width: 28px; text-align: right; }
+
+  .layers-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .layers-header .title { font-size: 11px; font-weight: 600; color: var(--text-bright); }
+  .layers-header .actions { display: flex; gap: 2px; }
+  .layers-header .actions button {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; transition: all 0.1s;
+  }
+  .layers-header .actions button:hover { background: var(--bg-hover); color: var(--text-bright); }
+  .layers-header .actions button svg { width: 14px; height: 14px; display: block; }
+
+  .elem-list { flex: 1; overflow-y: auto; padding: 2px 0; }
+
+  .elem-item {
+    display: flex; align-items: center; gap: 6px; padding: 4px 12px; cursor: default;
+    transition: background 0.08s; user-select: none;
+  }
+  .elem-item .elem-vis, .elem-item .elem-lock {
+    width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); cursor: pointer; border-radius: 2px; transition: color 0.1s;
+  }
+  .elem-item .elem-vis svg, .elem-item .elem-lock svg { width: 14px; height: 14px; display: block; }
+  .elem-item .elem-vis:hover, .elem-item .elem-lock:hover { color: var(--text-bright); }
+  .elem-item .elem-vis.off { opacity: 0.3; }
+  .elem-item .elem-lock.locked { color: var(--accent); }
+  .elem-item .elem-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .elem-item .elem-name { flex: 1; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .elem-item.selected .elem-name { color: var(--text-bright); background: var(--accent-dim); }
+
+  #CENTER {
+    grid-area: center; border-top: none;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(232,166,52,0.025) 0%, transparent 55%),
+      var(--bg-dark); overflow: hidden;
+  }
+
+  .artboard {
+    position: absolute; width: 640px; height: 480px;
+    background: #ffffff; box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 4px 40px rgba(0,0,0,0.4);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+  }
+  .artboard.tool-select { cursor: default; }
+  .artboard.tool-move { cursor: move; }
+  .artboard.tool-rotate { cursor: grab; }
+  .artboard.tool-scale { cursor: nwse-resize; }
+  .artboard.tool-skew { cursor: crosshair; }
+  .artboard.tool-rect, .artboard.tool-ellipse, .artboard.tool-polygon { cursor: crosshair; }
+  .artboard.tool-line, .artboard.tool-freehand, .artboard.tool-pen { cursor: crosshair; }
+  .artboard.tool-text { cursor: text; }
+  .artboard.tool-group, .artboard.tool-ungroup, .artboard.tool-lock, .artboard.tool-unlock { cursor: default; }
+  .artboard.tool-bool-union, .artboard.tool-bool-subtract, .artboard.tool-bool-intersect, .artboard.tool-bool-exclude { cursor: default; }
+
+  .sel-box { position: absolute; border: 1.5px solid var(--accent); pointer-events: none; }
+  .sel-handle {
+    position: absolute; width: 8px; height: 8px; background: #fff; border: 1.5px solid var(--accent);
+    transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer;
+  }
+  .sel-handle.nw { cursor: nw-resize; } .sel-handle.ne { cursor: ne-resize; }
+  .sel-handle.sw { cursor: sw-resize; } .sel-handle.se { cursor: se-resize; }
+  .sel-handle.n { cursor: n-resize; } .sel-handle.s { cursor: s-resize; }
+  .sel-handle.w { cursor: w-resize; } .sel-handle.e { cursor: e-resize; }
+  
+  /* Anchor Point */
+
+  /* The Anchor Point (White square/circle at the curve vertex) */
+  .sel-handle.anchor-point {
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 2px solid var(--accent);
+      transform: translate(-50%, -50%);
+      cursor: move;
+      z-index: 10;
+      transition: transform 0.1s;
+  }
+  .sel-handle.anchor-point:hover {
+      transform: translate(-50%, -50%) scale(1.2);
+      border-width: 3px;
+  }
+
+  /* The Line connecting anchor to control point */
+  .sel-handle.anchor-line {
+      position: absolute;
+      height: 2px;
+      background: var(--accent);
+      transform-origin: 0 50%;
+      transition: background 0.2s, height 0.2s;
+      z-index: 1;
+  }
+
+  .anchor-group:hover .sel-handle.anchor-line,
+.anchor-group:hover .sel-handle.anchor-line-in,
+.anchor-group:hover .sel-handle.anchor-line-out {
+      height: 3px;                     /* consistent thickness for all lines */
+      background: var(--accent-hover);
+      pointer-events: auto;
+  }
+
+
+  /* The Control Handle Circle (at the end of the line) */
+  .sel-handle.anchor-circle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      cursor: grab;
+      z-index: 11;
+      transition: border-width 0.2s, transform 0.2s;
+  }
+  .sel-handle.anchor-circle:hover {
+      border-width: 5px;
+      transform: translate(-50%, -50%) scale(1.2);
+  }
+
+  .sel-handle.anchor-circle-in {
+      border-color: var(--accent);
+      background: linear-gradient(90deg, var(--accent) 50%, #fff 50%);
+      border-radius: 50%;
+  }
+  .sel-handle.anchor-circle-out {
+      border-color: var(--accent);
+      background: linear-gradient(90deg, #fff 50%, var(--accent) 50%);
+      border-radius: 50%;
+  }
+  .sel-handle.anchor-circle-out::after {
+      content: 'I';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      color: #fff;
+      font-weight: bold;
+      pointer-events: none;
+      background: transparent;
+      z-index: 2;
+  }
+  .sel-handle.anchor-circle-in::after {
+      content: 'I';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      color: #fff;
+      font-weight: bold;
+      pointer-events: none;
+      background: transparent;
+      z-index: 2;
+  }
+
+  .sel-rotate-line {
+    position: absolute; left: 50%; top: 0; width: 1px; height: 20px;
+    background: var(--accent); transform: translateX(-50%) translateY(-20px); pointer-events: none;
+  }
+  .sel-rotate-handle {
+    position: absolute; left: 50%; top: 0; width: 10px; height: 10px;
+    background: #fff; border: 1.5px solid var(--accent); border-radius: 50%;
+    transform: translate(-50%, -50%) translateY(-20px); cursor: grab; pointer-events: auto;
+  }
+  .sel-pivot {
+    position: absolute; width: 10px; height: 10px;
+    pointer-events: auto;
+    cursor: crosshair; z-index: 10;
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .sel-pivot-inner {
+    position: absolute; inset: 0; border: 1.5px solid var(--accent);
+    background: rgba(255,255,255,0.85);
+  }
+
+  #canvas-grid {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0.3;
+    background-image: radial-gradient(circle, #444 0.8px, transparent 0.8px);
+    background-size: 20px 20px;
+  }
+
+  #menu-overlay { position: fixed; inset: 0; z-index: 999; display: none; }
+  #menu-overlay.show { display: block; }
+
+  #selection-overlay { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+
+  *:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+  .text-input-overlay {
+    position: absolute; background: transparent; border: 1px dashed var(--accent);
+    color: #000; font-size: 16px; font-family: inherit; padding: 2px 4px;
+    outline: none; z-index: 100; min-width: 60px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden">
+<defs>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-new" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></symbol>
+  <symbol id="i-saveas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4z"/><path d="M15 3v4h4"/><path d="M8 13h8"/><path d="M8 17h5"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+  <symbol id="i-font" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M9.354 4H14.646L20 20H4L9.354 4z"/><line x1="8" y1="20" x2="16" y2="20"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-crop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></symbol>
+  <symbol id="i-anim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 12 17 22 12 12 17 2"/><polyline points="7 22 2 12 7 2"/><polyline points="12 22 7 12 12 2"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></symbol>
+  <symbol id="i-cut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-selectall" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><polyline points="3 9 3 3 9 3"/><polyline points="15 3 21 3 21 9"/><polyline points="21 15 21 21 15 21"/><polyline points="9 21 3 21 3 15"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-zoomin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></symbol>
+  <symbol id="i-zoomout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0z"/><line x1="14.5" y1="5.5" x2="18.5" y2="9.5"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="4" y1="12" x2="7" y2="12"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+  <symbol id="i-snap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="6.5" cy="6.5" r="1" fill="currentColor"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/><circle cx="17.5" cy="17.5" r="1" fill="currentColor"/><circle cx="6.5" cy="17.5" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-snapobj" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M6.5 3v-1M6.5 8v1M3 6.5H2M8 6.5H9M17.5 3v-1M17.5 8v1M14 6.5h-1M19 6.5h1M17.5 14v-1M17.5 19v1M14 17.5h-1M19 17.5h1M6.5 14v-1M6.5 19v1M3 17.5H2M8 17.5H9"/></symbol>
+  <symbol id="i-snapanc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M6.5 3v-1M6.5 8v1M3 6.5H2M8 6.5H9M17.5 3v-1M17.5 8v1M14 6.5h-1M19 6.5h1M17.5 14v-1M17.5 19v1M14 17.5h-1M19 17.5h1M6.5 14v-1M6.5 19v1M3 17.5H2M8 17.5H9"/></symbol>
+  <symbol id="i-guides" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-front" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="14" height="14" rx="2" fill="currentColor"/><rect x="2" y="8" width="14" height="14" rx="2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="14" height="14" rx="2" fill="currentColor"/><rect x="8" y="2" width="14" height="14" rx="2" fill="var(--menu-bg)"/></symbol>
+  <symbol id="i-arrowup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/></symbol>
+  <symbol id="i-arrowdown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" fill="currentColor"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-lockopen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 7 0 0 1 9.9-1"/></symbol>
+  <symbol id="i-union" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="7"/><circle cx="15" cy="12" r="7"/></symbol>
+  <symbol id="i-subtract" viewBox="0 0 24 24" fill="none"><path d="M12 5.68A7 7 0 1 0 12 18.32A7 7 0 0 1 12 5.68Z" fill="currentColor"/><circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/></symbol>
+  <symbol id="i-intersect" viewBox="0 0 24 24"><path d="M12 5.675 A7 7 0 0 0 12 18.325 A7 7 0 0 0 12 5.675 Z" fill="currentColor" stroke="currentColor"/><circle cx="9" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2" fill="none"/><circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2" fill="none"/></symbol>
+  <symbol id="i-exclude" viewBox="0 0 24 24"><path d="M12 5.6754A7 7 0 1 0 12 18.3246A7 7 0 0 1 12 5.6754Z" fill="currentColor"/><path d="M12 5.6754A7 7 0 1 1 12 18.3246A7 7 0 0 0 12 5.6754Z" fill="currentColor"/><circle cx="9" cy="12" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/></symbol>
+  <symbol id="i-group" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="8" cy="10" r="2.5" fill="var(--bg-panel)"/><circle cx="16" cy="14" r="2.5" fill="var(--bg-panel)"/></symbol>
+  <symbol id="i-ungroup" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/><circle cx="8" cy="10" r="2.5" fill="currentColor"/><circle cx="16" cy="14" r="2.5" fill="currentColor"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+  <symbol id="i-cursor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-6 1-3 6z"/></symbol>
+  <symbol id="i-rect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></symbol>
+  <symbol id="i-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></symbol>
+  <symbol id="i-polyton" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 21.5 9 18 21 6 21 2.5 9"/></symbol>
+  <symbol id="i-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M0 12c4-12 8-12 12 0s8 12 12 0"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7H12v-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></symbol>
+<symbol id="i-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4L4 20"/><path d="M12 4l8 16"/><path d="M7.5 14h9"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+  <symbol id="i-geometry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></symbol>
+  <symbol id="i-droplet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-folderplus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
+</defs>
+</svg>
+
+<div id="menu-overlay"></div>
+
+<div id="app">
+  <!-- TOP BAR -->
+  <section id="TOP" role="menubar" aria-label="Main menu">
+    <div class="menu-item" data-menu="file" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-file"/></svg></span>File
+      <div class="dropdown" id="menu-file" role="menu">
+        <div class="dd-item" data-action="new"><span class="dd-icon"><svg><use href="#i-new"/></svg></span><span class="label">New Document</span><span class="shortcut">Ctrl+N</span></div>
+        <div class="dd-item" data-action="open"><span class="dd-icon"><svg><use href="#i-folder"/></svg></span><span class="label">Open...</span><span class="shortcut">Ctrl+O</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="save"><span class="dd-icon"><svg><use href="#i-save"/></svg></span><span class="label">Save</span><span class="shortcut">Ctrl+S</span></div>
+        <div class="dd-item" data-action="saveas"><span class="dd-icon"><svg><use href="#i-saveas"/></svg></span><span class="label">Save As...</span><span class="shortcut">Ctrl+Shift+S</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="import">
+          <span class="dd-icon"><svg><use href="#i-download"/></svg></span><span class="label">Import</span><span class="arrow">&#9656;</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="import-svg"><span class="dd-icon"><svg><use href="#i-code"/></svg></span><span class="label">SVG File</span></div>
+            <div class="dd-item" data-action="import-img"><span class="dd-icon"><svg><use href="#i-image"/></svg></span><span class="label">Raster Image</span></div>
+          </div>
+        </div>
+        <div class="dd-item" data-action="export">
+          <span class="dd-icon"><svg><use href="#i-upload"/></svg></span><span class="label">Export</span><span class="arrow">&#9656;</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="export-frame">
+              <span class="dd-icon"><svg><use href="#i-crop"/></svg></span><span class="label">Single Frame</span><span class="arrow">&#9656;</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-svg"><span class="label">SVG</span></div>
+                <div class="dd-item" data-action="export-bmp"><span class="label">BMP</span></div>
+                <div class="dd-item" data-action="export-png"><span class="label">PNG</span></div>
+                <div class="dd-item" data-action="export-jpg"><span class="label">JPEG</span></div>
+                <div class="dd-item" data-action="export-webp"><span class="label">WebP</span></div>
+              </div>
+            </div>
+            <div class="dd-sep"></div>
+            <div class="dd-item" data-action="export-anim">
+              <span class="dd-icon"><svg><use href="#i-anim"/></svg></span><span class="label">Animation</span><span class="arrow">&#9656;</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-gif"><span class="label">GIF</span></div>
+                <div class="dd-item" data-action="export-smil-svg"><span class="label">SVG + SMIL Animation</span></div>
+                <div class="dd-item" data-action="export-css-svg"><span class="label">SVG + CSS Animation</span></div>
+                <div class="dd-item" data-action="export-rawr"><span class="label">RAWR (Glaxnimate)</span></div>
+                <div class="dd-item" data-action="export-webm"><span class="label">WEBM</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="edit" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-edit"/></svg></span>Edit
+      <div class="dropdown" id="menu-edit" role="menu">
+        <div class="dd-item" id="menu-undo"><span class="dd-icon"><svg><use href="#i-undo"/></svg></span><span class="label">Undo</span><span class="shortcut">Ctrl+Z</span></div>
+        <div class="dd-item" id="menu-redo"><span class="dd-icon"><svg><use href="#i-redo"/></svg></span><span class="label">Redo</span><span class="shortcut">Ctrl+Shift+Z</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="cut"><span class="dd-icon"><svg><use href="#i-cut"/></svg></span><span class="label">Cut</span><span class="shortcut">Ctrl+X</span></div>
+        <div class="dd-item" data-action="copy"><span class="dd-icon"><svg><use href="#i-copy"/></svg></span><span class="label">Copy</span><span class="shortcut">Ctrl+C</span></div>
+        <div class="dd-item" data-action="paste"><span class="dd-icon"><svg><use href="#i-paste"/></svg></span><span class="label">Paste</span><span class="shortcut">Ctrl+V</span></div>
+        <div class="dd-item" data-action="duplicate"><span class="dd-icon"><svg><use href="#i-copy"/></svg></span><span class="label">Duplicate</span><span class="shortcut">Ctrl+D</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="delete"><span class="dd-icon"><svg><use href="#i-trash"/></svg></span><span class="label">Delete</span><span class="shortcut">Del</span></div>
+        <div class="dd-item" data-action="selectall"><span class="dd-icon"><svg><use href="#i-selectall"/></svg></span><span class="label">Select All</span><span class="shortcut">Ctrl+A</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="preferences"><span class="dd-icon"><svg><use href="#i-settings"/></svg></span><span class="label">Preferences</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="view" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-eye"/></svg></span>View
+      <div class="dropdown" id="menu-view" role="menu">
+        <div class="dd-item" data-action="zoom-in"><span class="dd-icon"><svg><use href="#i-zoomin"/></svg></span><span class="label">Zoom In</span><span class="shortcut">Ctrl+=</span></div>
+        <div class="dd-item" data-action="zoom-out"><span class="dd-icon"><svg><use href="#i-zoomout"/></svg></span><span class="label">Zoom Out</span><span class="shortcut">Ctrl+-</span></div>
+        <div class="dd-item" data-action="zoom-fit"><span class="dd-icon"><svg><use href="#i-fit"/></svg></span><span class="label">Fit to Screen</span><span class="dd-icon"><svg><use href="#i-lockopen"/></svg></span><span class="shortcut">Ctrl+5</span></div>
+        <div class="dd-item" data-action="zoom-100"><span class="label">100%</span><span class="dd-icon"><svg><use href="#i-lockopen"/></svg></span><span class="shortcut">Ctrl+1</span></div>
+        <div class="dd-item" data-action="center"><span class="label">Center</span><span class="shortcut">Ctrl+0</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-rulers"><span class="dd-icon"><svg><use href="#i-ruler"/></svg></span><span class="label">Rulers</span><span class="shortcut">Ctrl+R</span></div>
+        <div class="dd-item" data-action="toggle-grid"><span class="dd-icon"><svg><use href="#i-grid"/></svg></span><span class="label">Grid</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="toggle-snap"><span class="dd-icon"><svg><use href="#i-snap"/></svg></span><span class="label">Snap to Grid</span></div>
+        <div class="dd-item" data-action="toggle-snap-obj"><span class="dd-icon"><svg><use href="#i-snapobj"/></svg></span><span class="label">Snap to Elements</span></div>
+        <div class="dd-item" data-action="toggle-snap-anc"><span class="dd-icon"><svg><use href="#i-snapanc"/></svg></span><span class="label">Snap to Anchors</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-guides"><span class="dd-icon"><svg><use href="#i-guides"/></svg></span><span class="label">Guides</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="element" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-layers"/></svg></span>Element
+      <div class="dropdown" id="menu-object" role="menu">
+        <div class="dd-item" data-action="move-front"><span class="dd-icon"><svg><use href="#i-front"/></svg></span><span class="label">Bring to Front</span><span class="shortcut">Ctrl+Shift+]</span></div>
+        <div class="dd-item" data-action="move-up"><span class="dd-icon"><svg><use href="#i-arrowup"/></svg></span><span class="label">Bring Forward</span><span class="shortcut">Ctrl+]</span></div>
+        <div class="dd-item" data-action="move-down"><span class="dd-icon"><svg><use href="#i-arrowdown"/></svg></span><span class="label">Send Backward</span><span class="shortcut">Ctrl+[</span></div>
+        <div class="dd-item" data-action="move-back"><span class="dd-icon"><svg><use href="#i-back"/></svg></span><span class="label">Send to Back</span><span class="shortcut">Ctrl+Shift+[</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="group"><span class="dd-icon"><svg><use href="#i-group"/></svg></span><span class="label">Group</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="ungroup"><span class="dd-icon"><svg><use href="#i-ungroup"/></svg></span><span class="label">Ungroup</span><span class="shortcut">Ctrl+Shift+G</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="lock"><span class="dd-icon"><svg><use href="#i-lock"/></svg></span><span class="label">Lock</span><span class="shortcut">Ctrl+L</span></div>
+        <div class="dd-item" data-action="unlock-all"><span class="dd-icon"><svg><use href="#i-lockopen"/></svg></span><span class="label">Unlock All</span><span class="shortcut">Ctrl+Shift+L</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="bool-union"><span class="dd-icon"><svg><use href="#i-union"/></svg></span><span class="label">Union</span></div>
+        <div class="dd-item" data-action="bool-subtract"><span class="dd-icon"><svg><use href="#i-subtract"/></svg></span><span class="label">Subtract</span></div>
+        <div class="dd-item" data-action="bool-intersect"><span class="dd-icon"><svg><use href="#i-intersect"/></svg></span><span class="label">Intersect</span></div>
+        <div class="dd-item" data-action="bool-exclude"><span class="dd-icon"><svg><use href="#i-exclude"/></svg></span><span class="label">Exclude</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="help" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-help"/></svg></span>Help
+      <div class="dropdown" id="menu-help" role="menu">
+        <div class="dd-item" data-action="about"><span class="dd-icon"><svg><use href="#i-info"/></svg></span><span class="label">About WebVG</span></div>
+        <div class="dd-item" data-action="shortcuts"><span class="dd-icon"><svg><use href="#i-keyboard"/></svg></span><span class="label">Keyboard Shortcuts</span><span class="shortcut">Ctrl+K</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="docs"><span class="dd-icon"><svg><use href="#i-book"/></svg></span><span class="label">Documentation</span></div>
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div id="status-bar" style="display:flex; align-items:center; gap:8px; padding-right:4px; font-size:11px; color:var(--text-dim);">
+      <span id="status-dims">640 × 480</span><span>|</span><span id="status-zoom">100%</span>
+    </div>
+  </section>
+
+  <!-- LEFT TOOLBAR -->
+  <section id="LEFT" role="toolbar" aria-label="Tools">
+    <div class="tool-btn active" data-tool="select" data-tip="Select (V)"><svg><use href="#i-cursor"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="rect" data-tip="Rectangle (R)" title="Rectangle (R)"><svg><use href="#i-rect"/></svg></div>
+    <div class="tool-btn" data-tool="ellipse" data-tip="Ellipse (E)" title="llipse (E)"><svg><use href="#i-circle"/></svg></div>
+    <div class="tool-btn" data-tool="polygon" data-tip="Polygon (P)" title="Polygon (P)"><svg><use href="#i-polyton"/></svg></div>
+    <div class="tool-btn" data-tool="line" data-tip="Line (L)" title="Line (L)"><svg><use href="#i-line"/></svg></div>
+    <div class="tool-btn" data-tool="freehand" data-tip="Path (W)" title="Path (W)"><svg><use href="#i-wave"/></svg></div>
+    <div class="tool-btn" data-tool="pen" data-tip="Pen (N)" title="Pen (N)"><svg><use href="#i-pen"/></svg></div>
+    <div class="tool-btn" data-tool="text" data-tip="Text (X)" title="ext (X)"><svg><use href="#i-text"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="group" data-tip="Group" title="Group"><svg><use href="#i-group"/></svg></div>
+    <div class="tool-btn" data-tool="ungroup" data-tip="Ungroup" title="Ungroup"><svg><use href="#i-ungroup"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="lock" data-tip="Lock" title="Lock"><svg><use href="#i-lock"/></svg></div>
+    <div class="tool-btn" data-tool="unlock" data-tip="Unlock" title="Unlock"><svg><use href="#i-lockopen"/></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="bool-union" data-tip="Union" title="Union"><svg><use href="#i-union"/></svg></div>
+    <div class="tool-btn" data-tool="bool-subtract" data-tip="Subtract" title="Subtract"><svg><use href="#i-subtract"/></svg></div>
+    <div class="tool-btn" data-tool="bool-intersect" data-tip="Intersect" title="Intersect"><svg><use href="#i-intersect"/></svg></div>
+    <div class="tool-btn" data-tool="bool-exclude" data-tip="Exclude" title="Exclude"><svg><use href="#i-exclude"/></svg></div>
+  </section>
+
+  <!-- CENTER CANVAS -->
+  <section id="CENTER" role="main" aria-label="Canvas">
+    <div id="canvas-grid"></div>
+    <div class="artboard tool-select" id="artboard">
+      <svg id="main-svg" width="640" height="480" xmlns="http://www.w3.org/2000/svg" style="display:block;"></svg>
+      <div id="selection-overlay"></div>
+    </div>
+  </section>
+
+  <!-- RIGHT PANEL -->
+  <section id="RIGHT" aria-label="Properties">
+    <div class="prop-btn active" data-panel="options" data-tip="Options"><svg><use href="#i-tune"/></svg></div>
+    <div class="prop-btn" data-panel="geometry" data-tip="Geometry"><svg><use href="#i-geometry"/></svg></div>
+    <div class="prop-btn" data-panel="appearance" data-tip="Appearance"><svg><use href="#i-droplet"/></svg></div>
+    <div class="prop-btn" data-panel="layers" data-tip="Elements"><svg><use href="#i-list"/></svg></div>
+  </section>
+</div>
+
+<!-- RIGHT FLYOUT -->
+<div id="right-flyout">
+  <div class="flyout-header">Properties</div>
+  <div class="flyout-body" id="flyout-body">
+    <div class="section" data-section="options">
+      <div class="section-head"><span class="title">Options</span><span class="chevron"><svg><use href="#i-chevron"/></svg></span></div>
+      <div class="section-body">
+        <div class="color-row">
+          <div class="color-swatch" id="swatch-fill" style="background:#e8a634"><input type="color" id="prop-fill" value="#e8a634" aria-label="Fill color"></div>
+          <span class="color-label">Fill</span>
+          <div style="flex:1"></div>
+          <div class="color-swatch" id="swatch-stroke" style="background:#000000"><input type="color" id="prop-stroke" value="#000000" aria-label="Stroke color"></div>
+          <span class="color-label">Stroke</span>
+        </div>
+        <div class="field">
+          <label>S.W.</label>
+          <input type="number" id="prop-strokew" value="0" min="0" max="100" step="0.5" aria-label="Stroke width">
+        </div>
+      </div>
+    </div>
+    <div class="section" data-section="geometry">
+      <div class="section-head"><span class="title">Geometry</span><span class="chevron"><svg><use href="#i-chevron"/></svg></span></div>
+      <div class="section-body">
+        <div class="field-row">
+          <div class="field"><label>X</label><input type="number" id="prop-x" value="0" aria-label="X position"></div>
+          <div class="field"><label>Y</label><input type="number" id="prop-y" value="0" aria-label="Y position"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>W</label><input type="number" id="prop-w" value="0" min="1" aria-label="Width"></div>
+          <div class="field"><label>H</label><input type="number" id="prop-h" value="0" min="1" aria-label="Height"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>P.X</label><input type="number" id="prop-px" value="0" aria-label="Pivot X"></div>
+          <div class="field"><label>P.Y</label><input type="number" id="prop-py" value="0" aria-label="Pivot Y"></div>
+        </div>
+        <div class="field">
+          <label style="font-size:13px;">&#x21BB;</label>
+          <input type="number" id="prop-rot" value="0" min="-360" max="360" step="1" aria-label="Rotation">
+          <span style="font-size:10px; color:var(--text-dim);">deg</span>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>R</label><input type="number" id="prop-rx" value="0" min="0" aria-label="Corner radius"></div>
+          <div class="field"><label>S</label><input type="number" id="prop-sides" value="5" min="3" max="64" step="1" aria-label="Sides"></div>
+        </div>
+      </div>
+    </div>
+    <div class="section" data-section="appearance">
+      <div class="section-head"><span class="title">Opacity &amp; Blend</span><span class="chevron"><svg><use href="#i-chevron"/></svg></span></div>
+      <div class="section-body">
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Fill</label>
+          <input type="range" class="field-ctrl" id="prop-fillop" min="0" max="100" value="100" aria-label="Fill Opacity">
+          <span class="range-val" id="val-fillop">100%</span>
+        </div>
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Stroke</label>
+          <input type="range" class="field-ctrl" id="prop-strokeop" min="0" max="100" value="100" aria-label="Stroke Opacity">
+          <span class="range-val" id="val-strokeop">100%</span>
+        </div>
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Blend</label>
+          <select class="field-ctrl" id="prop-blend" aria-label="Blend mode">
+            <option>Normal</option><option>Multiply</option><option>Screen</option><option>Overlay</option><option>Darken</option><option>Lighten</option><option>Color Dodge</option><option>Color Burn</option><option>Hard Light</option><option>Soft Light</option><option>Difference</option><option>Exclusion</option><option>Hue</option><option>Saturation</option><option>Color</option><option>Luminosity</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layers-header">
+    <span class="title">Elements</span>
+    <div class="actions">
+      <button title="New Element" aria-label="New element" id="btn-elem-add"><svg><use href="#i-plus"/></svg></button>
+      <button title="New Folder" aria-label="New folder" id="btn-folder-add"><svg><use href="#i-folderplus"/></svg></button>
+      <button title="Delete Element" aria-label="Delete element" id="btn-elem-del"><svg><use href="#i-trash"/></svg></button>
+    </div>
+  </div>
+  <div class="elem-list" id="elem-list"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   CLASSES
+   ═══════════════════════════════════════════ */
+/**
+ * Anchor Class for WebVG
+ * Stores position (x, y) and tangent angles (in radians) for curve handles.
+ * Unlike Slidus which stored Cartesian control points (cIn/cOut), 
+ * this stores the Angle, allowing for easier manipulation of curve direction.
+ */
+class Anchor {
+    constructor(x, y, angleIn = 0, angleOut = 0) {
+        this.x = x;
+        this.y = y;
+        this.angleIn = angleIn;
+        this.angleOut = angleOut;
+        this.handleLengthIn = 50;  // Separate length for IN handle
+        this.handleLengthOut = 50; // Separate length for OUT handle
+    }
+
+    getControlPoints() {
+        return {
+            p: { x: this.x, y: this.y },
+            cIn: {
+                x: this.x - Math.cos(this.angleIn) * this.handleLengthIn,
+                y: this.y - Math.sin(this.angleIn) * this.handleLengthIn
+            },
+            cOut: {
+                x: this.x + Math.cos(this.angleOut) * this.handleLengthOut,
+                y: this.y + Math.sin(this.angleOut) * this.handleLengthOut
+            }
+        };
+    }
+
+    updateAngle(mx, my, side) {
+        const dx = mx - this.x;
+        const dy = my - this.y;
+        const newAngle = Math.atan2(dy, dx);
+        const newLength = Math.hypot(dx, dy);
+        
+        if (side === 'in') {
+            // Flip the angle by 180° (π radians) for In handles
+            // This makes the visual circle appear at the mouse position
+            // while keeping the curve math correct (control point points backwards)
+            this.angleIn = newAngle + Math.PI;
+            this.handleLengthIn = newLength;
+        }
+        if (side === 'out') {
+            // Out handles use the angle directly
+            this.angleOut = newAngle;
+            this.handleLengthOut = newLength;
+        }
+    }
+}
+
+class Path {
+    constructor(config) {
+        this.id = config.id || 0;
+        this.name = config.name || 'Path';
+        this.type = config.type || 'path'; // 'path' or 'line'
+        this.anchors = config.anchors || [];
+        this.closed = config.closed || false;
+        
+        // Styling
+        this.fill = config.fill || 'none';
+        this.stroke = config.stroke || '#000000';
+        this.strokeW = config.strokeW || 2;
+        this.fillOp = config.fillOp !== undefined ? config.fillOp : 1;
+        this.strokeOp = config.strokeOp !== undefined ? config.strokeOp : 1;
+        this.blend = config.blend || 'Normal';
+        
+        this.visible = config.visible !== false;
+        this.locked = config.locked || false;
+        
+        // Rotation (optional, usually around a pivot)
+        this.rot = config.rot || 0;
+        this.px = config.px || 0; // Pivot X
+        this.py = config.py || 0; // Pivot Y
+        
+        // If no pivot set, default to center of first two anchors or 0,0
+        if (this.anchors.length > 0 && (this.px === 0 && this.py === 0)) {
+             this._updatePivot();
+        }
+    }
+
+    // Calculate Pivot if not set
+    _updatePivot() {
+        const b = this.getBounds();
+        this.px = b.x + b.w / 2;
+        this.py = b.y + b.h / 2;
+    }
+
+    // Get Bounding Box (Calculated from Anchors + Control Points)
+    getBounds() {
+        if (this.anchors.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        this.anchors.forEach(a => {
+            // Check anchor
+            minX = Math.min(minX, a.x);
+            minY = Math.min(minY, a.y);
+            maxX = Math.max(maxX, a.x);
+            maxY = Math.max(maxY, a.y);
+
+            // Check control points
+            const cp = a.getControlPoints();
+            minX = Math.min(minX, cp.cIn.x, cp.cOut.x);
+            minY = Math.min(minY, cp.cIn.y, cp.cOut.y);
+            maxX = Math.max(maxX, cp.cIn.x, cp.cOut.x);
+            maxY = Math.max(maxY, cp.cIn.y, cp.cOut.y);
+        });
+
+        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    }
+
+    // Move the entire path
+    move(dx, dy) {
+        this.anchors.forEach(a => {
+            a.x += dx;
+            a.y += dy;
+        });
+        this.px += dx;
+        this.py += dy;
+    }
+
+    // Generate SVG 'd' string
+    getPathString() {
+        if (this.anchors.length < 2) return '';
+
+        let d = `M ${this.anchors[0].x.toFixed(1)} ${this.anchors[0].y.toFixed(1)}`;
+
+        if (this.type === 'line') {
+            // Straight lines: Just connect points with 'L'
+            for (let i = 1; i < this.anchors.length; i++) {
+                const a = this.anchors[i];
+                d += ` L ${a.x.toFixed(1)} ${a.y.toFixed(1)}`;
+            }
+        } else {
+            // Curved paths: Use 'C' (Bezier)
+            for (let i = 0; i < this.anchors.length - 1; i++) {
+                const curr = this.anchors[i];
+                const next = this.anchors[i+1];
+                const cp = curr.getControlPoints();
+                const nextCp = next.getControlPoints();
+                d += ` C ${cp.cOut.x.toFixed(1)} ${cp.cOut.y.toFixed(1)}, ${nextCp.cIn.x.toFixed(1)} ${nextCp.cIn.y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`;
+            }
+        }
+
+        if (this.closed) {
+            // Closing logic (usually not for lines, but safe to keep)
+            const first = this.anchors[0];
+            const last = this.anchors[this.anchors.length - 1];
+            if (this.type === 'line') {
+                d += ` L ${first.x.toFixed(1)} ${first.y.toFixed(1)} Z`;
+            } else {
+                const firstCp = first.getControlPoints();
+                const lastCp = last.getControlPoints();
+                d += ` C ${lastCp.cOut.x.toFixed(1)} ${lastCp.cOut.y.toFixed(1)}, ${firstCp.cIn.x.toFixed(1)} ${firstCp.cIn.y.toFixed(1)}, ${first.x.toFixed(1)} ${first.y.toFixed(1)} Z`;
+            }
+        }
+
+        return d;
+    }
+}
+   
+class Element {
+  constructor(config) {
+    this.id = config.id || 0;
+    this.type = config.type || 'rect';
+    this.name = config.name || 'Element';
+    
+    // For non-paths, x/y are the primary position.
+    // For paths, x/y are DERIVED from anchors.
+    this.x = config.x || 0;
+    this.y = config.y || 0;
+    this.w = config.w || 0;
+    this.h = config.h || 0;
+    
+    this.x2 = config.x2; 
+    this.y2 = config.y2;
+    this.rot = config.rot || 0;
+    this.visible = config.visible !== false;
+    this.locked = config.locked || false;
+    
+    // Pivot defaults to center of the element's bounds
+    this.px = config.px !== undefined ? config.px : (config.x + (config.w || 0) / 2);
+    this.py = config.py !== undefined ? config.py : (config.y + (config.h || 0) / 2);
+    
+    this.fill = config.fill || '#e8a634';
+    this.stroke = config.stroke || '#000000';
+    this.strokeW = config.strokeW || 0;
+    this.fillOp = config.fillOp !== undefined ? config.fillOp : 1;
+    this.strokeOp = config.strokeOp !== undefined ? config.strokeOp : 1;
+    this.blend = config.blend || 'Normal';
+    
+    this.rx = config.rx || 0;
+    this.ry = config.ry || 0;
+    this.sides = config.sides || 5;
+    this.d = config.d || ''; 
+    this.textContent = config.textContent || '';
+    this.fontSize = config.fontSize || 16;
+    
+    // Store Anchors
+    this.anchors = config.anchors || [];
+    this.closed = config.closed || false;
+
+    // CRITICAL: If we have anchors, sync x/y/w/h to match them immediately
+    if (this.anchors.length > 0) {
+        this._syncBoundsFromAnchors();
+    }
+  }
+
+  // Helper to update x,y,w,h based on current anchors
+  _syncBoundsFromAnchors() {
+    if (this.anchors.length === 0) return;
+    
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    this.anchors.forEach(a => {
+        minX = Math.min(minX, a.x);
+        minY = Math.min(minY, a.y);
+        maxX = Math.max(maxX, a.x);
+        maxY = Math.max(maxY, a.y);
+    });
+
+    this.x = minX;
+    this.y = minY;
+    this.w = maxX - minX;
+    this.h = maxY - minY;
+    
+    // Update pivot to center of new bounds
+    this.px = this.x + this.w / 2;
+    this.py = this.y + this.h / 2;
+  }
+  
+  getWorldCenter() {
+    const absCx = this.x + this.w / 2;
+    const absCy = this.y + this.h / 2;
+    const rad = this.rot * Math.PI / 180;
+    return {
+      x: this.px + (absCx - this.px) * Math.cos(rad) - (absCy - this.py) * Math.sin(rad),
+      y: this.py + (absCx - this.px) * Math.sin(rad) + (absCy - this.py) * Math.cos(rad)
+    };
+  }
+
+  getWorldPos() {
+    const cx = this.x + this.w / 2;
+    const cy = this.y + this.h / 2;
+    const rad = this.rot * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return {
+      x: this.px + (cx * cos - cy * sin) - this.w / 2,
+      y: this.py + (cx * sin + cy * cos) - this.h / 2
+    };
+  }
+
+  move(dx, dy) {
+    if (this.type === 'line') {
+      this.x += dx; this.y += dy;
+      this.x2 += dx; this.y2 += dy;
+    } 
+    // FIXED: For paths, move the anchors directly
+    else if (this.type === 'path' || this.type === 'freehand') {
+      if (this.anchors && this.anchors.length > 0) {
+        this.anchors.forEach(a => {
+          a.x += dx;
+          a.y += dy;
+        });
+        // Sync the wrapper x/y/w/h AFTER moving anchors
+        this._syncBoundsFromAnchors();
+      }
+    } 
+    else {
+      this.x += dx; this.y += dy;
+    }
+    
+    // Always move the pivot
+    this.px += dx;
+    this.py += dy;
+  }
+
+  setBounds(handle, start, dx, dy) {
+    const { x, y, w, h } = start;
+    
+    switch (handle) {
+      case 'nw':
+        this.x = x + dx;
+        this.y = y + dy;
+        this.w = Math.max(1, w - dx);
+        this.h = Math.max(1, h - dy);
+        break;
+      case 'n':
+        this.y = y + dy;
+        this.h = Math.max(1, h - dy);
+        break;
+      case 'ne':
+        this.y = y + dy;
+        this.w = Math.max(1, w + dx);
+        this.h = Math.max(1, h - dy);
+        break;
+      case 'w':
+        this.x = x + dx;
+        this.w = Math.max(1, w - dx);
+        break;
+      case 'e':
+        this.w = Math.max(1, w + dx);
+        break;
+      case 'sw':
+        this.x = x + dx;
+        this.w = Math.max(1, w - dx);
+        this.h = Math.max(1, h + dy);
+        break;
+      case 's':
+        this.h = Math.max(1, h + dy);
+        break;
+      case 'se':
+        this.w = Math.max(1, w + dx);
+        this.h = Math.max(1, h + dy);
+        break;
+    }
+    
+    // Center the pivot on the element
+    this.px = this.x + this.w / 2;
+    this.py = this.y + this.h / 2;
+  }
+  
+  updateDraw(mx, my) {
+     if (this.type === 'line') {
+       this.x2 = mx; this.y2 = my;
+       this.x = Math.min(this.x, this.x2);
+       this.y = Math.min(this.y, this.y2);
+       this.w = Math.abs(this.x2 - this.x);
+       this.h = Math.abs(this.y2 - this.y);
+     } else if (this.type === 'freehand') {
+       const b = this.getBounds();
+       this.x = b.x; this.y = b.y; this.w = b.w; this.h = b.h;
+     } else {
+       let w = Math.abs(mx - this.x);
+       let h = Math.abs(my - this.y);
+       if (window.event && window.event.ctrlKey) {
+         const size = Math.max(w, h);
+         w = size; h = size;
+       }
+       this.w = w; this.h = h;
+       if (mx < this.x) this.x = mx;
+       if (my < this.y) this.y = my;
+     }
+  }
+
+  getBounds() {
+    if (this.type === 'line') {
+      return {
+        x: Math.min(this.x, this.x2),
+        y: Math.min(this.y, this.y2),
+        w: Math.abs(this.x2 - this.x) || 8,
+        h: Math.abs(this.y2 - this.y) || 8
+      };
+    }
+    
+    // FIXED: Always calculate from anchors for paths to ensure accuracy
+    if ((this.type === 'path' || this.type === 'freehand') && this.anchors.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        
+        this.anchors.forEach(a => {
+            // Check anchor
+            minX = Math.min(minX, a.x);
+            minY = Math.min(minY, a.y);
+            maxX = Math.max(maxX, a.x);
+            maxY = Math.max(maxY, a.y);
+            
+            // Check control points
+            const cp = a.getControlPoints();
+            minX = Math.min(minX, cp.cIn.x, cp.cOut.x);
+            minY = Math.min(minY, cp.cIn.y, cp.cOut.y);
+            maxX = Math.max(maxX, cp.cIn.x, cp.cOut.x);
+            maxY = Math.max(maxY, cp.cIn.y, cp.cOut.y);
+        });
+        
+        if (minX === Infinity) return { x: 0, y: 0, w: 0, h: 0 };
+        
+        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    }
+    
+    return { x: this.x, y: this.y, w: this.w, h: this.h };
+  }
+
+  getPathString() {
+    if (this.type !== 'path' && this.type !== 'freehand') return this.d || '';
+    if (!this.anchors || this.anchors.length === 0) return this.d || '';
+    if (this.anchors.length < 2) return '';
+
+    let d = `M ${this.anchors[0].x.toFixed(1)} ${this.anchors[0].y.toFixed(1)}`;
+
+    for (let i = 0; i < this.anchors.length - 1; i++) {
+      const curr = this.anchors[i];
+      const next = this.anchors[i+1];
+      const cp = curr.getControlPoints();
+      const nextCp = next.getControlPoints();
+
+      d += ` C ${cp.cOut.x.toFixed(1)} ${cp.cOut.y.toFixed(1)}, ${nextCp.cIn.x.toFixed(1)} ${nextCp.cIn.y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`;
+    }
+    
+    if (this.closed) {
+       const first = this.anchors[0];
+       const last = this.anchors[this.anchors.length - 1];
+       const firstCp = first.getControlPoints();
+       const lastCp = last.getControlPoints();
+       d += ` C ${lastCp.cOut.x.toFixed(1)} ${lastCp.cOut.y.toFixed(1)}, ${firstCp.cIn.x.toFixed(1)} ${firstCp.cIn.y.toFixed(1)}, ${first.x.toFixed(1)} ${first.y.toFixed(1)} Z`;
+    }
+
+    return d;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   STATE & DATA MODEL
+   ═══════════════════════════════════════════ */
+let nextId = 6;
+let elements = [];
+let selectedIds = [];
+let activeTool = 'select';
+let clipboard = null;
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO = 50;
+
+/* Default style for new shapes */
+let defaultFill = '#e8a634';
+let defaultStroke = '#000000';
+let defaultStrokeW = 0;
+let polygonSides = 5;
+
+/* Create the initial elements */
+function initElements() {
+  // Helper for Anchors
+  const a = (x, y, angIn, angOut) => new Anchor(x, y, angIn, angOut);
+
+  elements = [
+    // Standard Elements (Shapes)
+    new Element({ id:1, type:'rect', name:'Rectangle 1', x:80, y:100, w:180, h:130, rx:8, ry:8, fill:'#e8a634', fillOp:0.5 }),
+    new Element({ id:2, type:'ellipse', name:'Ellipse 2', x:320, y:140, w:200, h:160, fill:'#3a8fd4' }),
+    new Element({ id:3, type:'polygon', name:'Triangle 3', x:300, y:280, w:140, h:70, sides:3, fill:'#5cb85c' }),
+    new Element({ id:4, type:'text', name:'Text 4', x:100, y:50, w:100, h:30, textContent:'Hello', fill:'#000' }),
+    
+    // NEW: Path Instances (Lines & Curves)
+    new Path({ 
+      id:5, 
+      type:'path', 
+      name:'Path 5', 
+      stroke:'#800000', 
+      strokeW:3, 
+      fill:'none',
+      anchors: [
+        a(40, 120, 0, Math.PI/2),        // Start
+        a(100, 150, -Math.PI/2, Math.PI), // Middle
+        a(160, 120, 0, Math.PI/2)        // End
+      ]
+    }),
+    
+    new Path({
+      id:6,
+      type:'line',
+      name:'Line 6',
+      stroke:'#0000ff',
+      strokeW:2,
+      anchors: [
+        a(200, 300, 0, 0),
+        a(400, 300, 0, 0)
+      ]
+    })
+  ];
+  selectedIds = [1];
+  saveState();
+}
+
+/* ═══════════════════════════════════════════
+   UNDO / REDO
+   ═══════════════════════════════════════════ */
+function saveState() {
+  undoStack.push(JSON.stringify({ elements, selectedIds }));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+  updateUndoMenu();
+}
+function undo() {
+  if (undoStack.length <= 1) return;
+  redoStack.push(undoStack.pop());
+  const s = JSON.parse(undoStack[undoStack.length - 1]);
+  // Restore class instances
+  elements = s.elements.map(e => new Element(e));
+  selectedIds = s.selectedIds;
+  renderAll(); updateUndoMenu();
+}
+function redo() {
+  if (!redoStack.length) return;
+  const s = JSON.parse(redoStack.pop());
+  undoStack.push(JSON.stringify(s));
+  elements = s.elements.map(e => new Element(e));
+  selectedIds = s.selectedIds;
+  renderAll(); updateUndoMenu();
+}
+function updateUndoMenu() {
+  const u = document.getElementById('menu-undo');
+  const r = document.getElementById('menu-redo');
+  if (u) u.classList.toggle('disabled', undoStack.length <= 1);
+  if (r) r.classList.toggle('disabled', redoStack.length === 0);
+}
+
+/* ═══════════════════════════════════════════
+   SVG RENDERING
+   ═══════════════════════════════════════════ */
+const svgNS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('main-svg');
+const selOverlay = document.getElementById('selection-overlay');
+
+function renderSVG() {
+  svg.innerHTML = '';
+  for (const item of elements) {
+    if (!item.visible) continue;
+    
+    let node;
+    
+    // --- HANDLE PATHS ---
+    if (item instanceof Path) {
+        node = document.createElementNS(svgNS, 'path');
+        node.setAttribute('d', item.getPathString());
+        node.setAttribute('stroke', item.stroke);
+        node.setAttribute('stroke-width', item.strokeW);
+        node.setAttribute('stroke-opacity', item.strokeOp);
+        node.setAttribute('fill', item.fill);
+        node.setAttribute('fill-opacity', item.fillOp);
+        node.setAttribute('stroke-linecap', 'round');
+        node.setAttribute('stroke-linejoin', 'round');
+        if (item.blend && item.blend !== 'Normal') node.style.mixBlendMode = item.blend;
+        
+        // Apply rotation if needed (around pivot)
+        if (item.rot) {
+            node.setAttribute('transform', `rotate(${item.rot}, ${item.px}, ${item.py})`);
+        }
+    }
+    // --- HANDLE ELEMENTS (SHAPES) ---
+    else if (item instanceof Element) {
+        switch (item.type) {
+            case 'rect':
+                node = document.createElementNS(svgNS, 'rect');
+                node.setAttribute('x', item.x); node.setAttribute('y', item.y);
+                node.setAttribute('width', Math.max(1, item.w)); node.setAttribute('height', Math.max(1, item.h));
+                if (item.rx) node.setAttribute('rx', item.rx);
+                if (item.ry) node.setAttribute('ry', item.ry);
+                break;
+            case 'ellipse':
+                node = document.createElementNS(svgNS, 'ellipse');
+                node.setAttribute('cx', item.x + item.w / 2); node.setAttribute('cy', item.y + item.h / 2);
+                node.setAttribute('rx', Math.max(0.5, item.w / 2)); node.setAttribute('ry', Math.max(0.5, item.h / 2));
+                break;
+            case 'polygon': {
+                const pts = polygonPoints(item.x, item.y, item.w, item.h, item.sides || 5);
+                node = document.createElementNS(svgNS, 'polygon');
+                node.setAttribute('points', pts);
+                break;
+            }
+            case 'text':
+                node = document.createElementNS(svgNS, 'text');
+                node.setAttribute('x', item.x); node.setAttribute('y', item.y + item.h);
+                node.setAttribute('font-size', item.fontSize || 16);
+                node.setAttribute('fill', item.fill !== 'none' ? item.fill : '#000');
+                node.textContent = item.textContent || 'Text';
+                break;
+        }
+        
+        if (node) {
+            if (item.fill && item.fill !== 'none') {
+                node.setAttribute('fill', item.fill);
+                node.setAttribute('fill-opacity', item.fillOp);
+            } else {
+                node.setAttribute('fill', 'none');
+            }
+            if (item.strokeW > 0) {
+                node.setAttribute('stroke', item.stroke);
+                node.setAttribute('stroke-width', item.strokeW);
+                node.setAttribute('stroke-opacity', item.strokeOp);
+                node.setAttribute('stroke-linecap', 'round');
+                node.setAttribute('stroke-linejoin', 'round');
+            }
+            if (item.blend && item.blend !== 'Normal') node.style.mixBlendMode = item.blend;
+            
+            if (item.rot) {
+                node.setAttribute('transform', `rotate(${item.rot}, ${item.px}, ${item.py})`);
+            }
+        }
+    }
+
+    if (!node) continue;
+    node.dataset.id = item.id;
+    svg.appendChild(node);
+  }
+}
+
+function polygonPoints(x, y, w, h, sides) {
+  const pts = [];
+  const cx = x + w / 2, cy = y + h / 2;
+  const rx = w / 2, ry = h / 2;
+  for (let i = 0; i < sides; i++) {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / sides;
+    pts.push(`${cx + rx * Math.cos(a)},${cy + ry * Math.sin(a)}`);
+  }
+  return pts.join(' ');
+}
+
+/* ═══════════════════════════════════════════
+   RENDER SELECTION
+   ═══════════════════════════════════════════ */
+function renderSelection() {
+  selOverlay.innerHTML = '';
+  
+  for (const id of selectedIds) {
+    const item = elements.find(e => e.id === id);
+    if (!item || !item.visible) continue;
+    
+    const b = item.getBounds();
+
+    // --- CASE 1: ELEMENTS (Rect, Ellipse, Polygon, Text) ---
+    if (item instanceof Element) {
+        const box = document.createElement('div');
+        box.className = 'sel-box';
+        box.style.left = b.x + 'px'; 
+        box.style.top = b.y + 'px';
+        box.style.width = b.w + 'px'; 
+        box.style.height = b.h + 'px';
+        
+        if (item.rot) {
+          box.style.transformOrigin = `${item.px - b.x}px ${item.py - b.y}px`;
+          box.style.transform = `rotate(${item.rot}deg)`;
+        }
+
+        // Rotation Handle
+        const rl = document.createElement('div'); 
+        rl.className = 'sel-rotate-line'; 
+        box.appendChild(rl);
+        
+        const rh = document.createElement('div'); 
+        rh.className = 'sel-rotate-handle'; 
+        rh.dataset.handle = 'rotate'; 
+        box.appendChild(rh);
+
+        // 8 Resize Handles
+        const dirs = ['nw','n','ne','w','e','sw','s','se'];
+        const pos = {
+          nw:[0,0], n:[b.w/2,0], ne:[b.w,0],
+          w:[0,b.h/2], e:[b.w,b.h/2],
+          sw:[0,b.h], s:[b.w/2,b.h], se:[b.w,b.h]
+        };
+        
+        for (const d of dirs) {
+          const h = document.createElement('div');
+          h.className = 'sel-handle ' + d;
+          h.style.left = pos[d][0] + 'px'; 
+          h.style.top = pos[d][1] + 'px';
+          h.dataset.handle = d;
+          box.appendChild(h);
+        }
+
+        // Pivot Point
+        const pivot = document.createElement('div');
+        pivot.className = 'sel-pivot';
+        pivot.dataset.handle = 'pivot';
+        pivot.style.left = item.px + 'px';
+        pivot.style.top = item.py + 'px';
+        const pInner = document.createElement('div');
+        pInner.className = 'sel-pivot-inner';
+        pivot.appendChild(pInner);
+        selOverlay.appendChild(pivot);
+
+        selOverlay.appendChild(box);
+    }
+
+    // --- CASE 2: PATHS (Lines, Curves) ---
+    else if (item instanceof Path) {
+        const group = document.createElement('div');
+        group.className = 'anchor-group';
+        group.style.pointerEvents = 'auto';
+        selOverlay.appendChild(group);
+
+        const isLine = item.type === 'line';
+
+        // Helper to rotate a point around the pivot
+        function rotatePoint(x, y, pivotX, pivotY, angleDeg) {
+            if (angleDeg === 0) return { x, y };
+            const rad = angleDeg * Math.PI / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            const dx = x - pivotX;
+            const dy = y - pivotY;
+            return {
+                x: pivotX + (dx * cos - dy * sin),
+                y: pivotY + (dx * sin + dy * cos)
+            };
+        }
+
+        // 1. Draw Move and Rotate Buttons
+        if (item.anchors.length > 0) {
+            const firstAnchor = item.anchors[0];
+            // Rotate the button position if the path is rotated
+            const btnPos = rotatePoint(firstAnchor.x, firstAnchor.y, item.px, item.py, item.rot);
+            const btnOffset = 20;
+
+            // Move Button
+            const moveBtn = document.createElement('div');
+            moveBtn.className = 'sel-handle';
+            moveBtn.style.position = 'absolute';
+            moveBtn.style.left = (btnPos.x - btnOffset) + 'px';
+            moveBtn.style.top = (btnPos.y - btnOffset) + 'px';
+            moveBtn.style.width = '18px';
+            moveBtn.style.height = '18px';
+            moveBtn.style.border = 'none';
+            moveBtn.style.cursor = 'move';
+            moveBtn.style.zIndex = '20';
+            moveBtn.dataset.handle = 'path-move';
+            moveBtn.innerHTML = `<svg style="width:100%;height:100%;display:block;"><use href="#i-move"/></svg>`;
+            group.appendChild(moveBtn);
+
+            // Rotate Button
+            const rotateBtn = document.createElement('div');
+            rotateBtn.className = 'sel-handle';
+            rotateBtn.style.position = 'absolute';
+            rotateBtn.style.left = (btnPos.x + btnOffset) + 'px';
+            rotateBtn.style.top = (btnPos.y - btnOffset) + 'px';
+            rotateBtn.style.width = '18px';
+            rotateBtn.style.height = '18px';
+            rotateBtn.style.cursor = 'grab';
+            rotateBtn.style.zIndex = '20';
+            rotateBtn.style.border = 'none';
+            rotateBtn.dataset.handle = 'path-rotate';
+            rotateBtn.innerHTML = `<svg style="width:100%;height:100%;display:block;"><use href="#i-rotate"/></svg>`;
+            group.appendChild(rotateBtn);
+        }
+
+        // 2. Draw Anchor Points and Handles
+        const isDraggingPath = (dragMode === 'move-path' || dragMode === 'rotate-path' || dragMode === 'move-anchor');
+
+        if (!isDraggingPath) {
+            item.anchors.forEach((anchor, index) => {
+              const isFirst = index === 0;
+              const isLast  = index === item.anchors.length - 1;
+              const isEdge = !item.closed && (isFirst || isLast);
+
+              // Get the rotated position of the anchor
+              const rotAnchor = rotatePoint(anchor.x, anchor.y, item.px, item.py, item.rot);
+
+              // Anchor point
+              const anchorNode = document.createElement('div');
+              anchorNode.className = 'sel-handle anchor-point';
+              anchorNode.style.left = rotAnchor.x + 'px';
+              anchorNode.style.top  = rotAnchor.y + 'px';
+              anchorNode.dataset.index = index;
+              anchorNode.dataset.handle = 'anchor-pos';
+              group.appendChild(anchorNode);
+
+              // OUT handle
+              if (!isLine) {
+                const showOut = !isLast || item.closed;
+                if (showOut) {
+                  const cpOut = anchor.getControlPoints().cOut;
+                  // Rotate the control point position
+                  const rotCpOut = rotatePoint(cpOut.x, cpOut.y, item.px, item.py, item.rot);
+                  
+                  const lenOut = Math.hypot(rotCpOut.x - rotAnchor.x, rotCpOut.y - rotAnchor.y);
+                  // Calculate angle relative to the rotated anchor
+                  const angleOut = Math.atan2(rotCpOut.y - rotAnchor.y, rotCpOut.x - rotAnchor.x);
+
+                  const lineOut = document.createElement('div');
+                  lineOut.className = 'sel-handle anchor-line';
+                  lineOut.style.left = rotAnchor.x + 'px';
+                  lineOut.style.top  = rotAnchor.y + 'px';
+                  lineOut.style.width = lenOut + 'px';
+                  lineOut.style.transform = `rotate(${angleOut}rad)`;
+                  lineOut.dataset.index = index;
+                  lineOut.dataset.handle = 'anchor-out';
+                  group.appendChild(lineOut);
+
+                  const circleOut = document.createElement('div');
+                  circleOut.className = 'sel-handle anchor-circle anchor-circle-out';
+                  circleOut.style.left = rotCpOut.x + 'px';
+                  circleOut.style.top  = rotCpOut.y + 'px';
+                  circleOut.dataset.index = index;
+                  circleOut.dataset.handle = 'anchor-out';
+                  group.appendChild(circleOut);
+                }
+
+                // IN handle
+                const showIn = !isFirst || item.closed;
+                if (showIn) {
+                  const cpIn = anchor.getControlPoints().cIn;
+                  const rotCpIn = rotatePoint(cpIn.x, cpIn.y, item.px, item.py, item.rot);
+                  const lenIn = Math.hypot(rotCpIn.x - rotAnchor.x, rotCpIn.y - rotAnchor.y);
+                  
+                  if (lenIn > 1) {
+                    const angleIn = Math.atan2(rotCpIn.y - rotAnchor.y, rotCpIn.x - rotAnchor.x);
+
+                    const lineIn = document.createElement('div');
+                    lineIn.className = 'sel-handle anchor-line anchor-line-in';
+                    lineIn.style.left = rotAnchor.x + 'px';
+                    lineIn.style.top  = rotAnchor.y + 'px';
+                    lineIn.style.width = lenIn + 'px';
+                    lineIn.style.transform = `rotate(${angleIn}rad)`;
+                    lineIn.dataset.index = index;
+                    lineIn.dataset.handle = 'anchor-in';
+                    group.appendChild(lineIn);
+
+                    const circleIn = document.createElement('div');
+                    circleIn.className = 'sel-handle anchor-circle anchor-circle-in';
+                    circleIn.style.left = rotCpIn.x + 'px';
+                    circleIn.style.top  = rotCpIn.y + 'px';
+                    circleIn.dataset.index = index;
+                    circleIn.dataset.handle = 'anchor-in';
+                    group.appendChild(circleIn);
+                  }
+                }
+              }
+            });
+        }
+        
+        // Pivot Point for Paths
+        const pivot = document.createElement('div');
+        pivot.className = 'sel-pivot';
+        pivot.dataset.handle = 'pivot';
+        pivot.style.left = item.px + 'px';
+        pivot.style.top = item.py + 'px';
+        const pInner = document.createElement('div');
+        pInner.className = 'sel-pivot-inner';
+        pivot.appendChild(pInner);
+        group.appendChild(pivot);
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
+   ELEMENT LIST (ELEMENTS PANEL)
+   ═══════════════════════════════════════════ */
+const elemList = document.getElementById('elem-list');
+
+function renderElementList() {
+  elemList.innerHTML = '';
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    const item = document.createElement('div');
+    item.className = 'elem-item' + (selectedIds.includes(el.id) ? ' selected' : '');
+    item.dataset.elemId = el.id;
+
+    const vis = document.createElement('span');
+    vis.className = 'elem-vis' + (el.visible ? '' : ' off');
+    vis.title = 'Toggle visibility';
+    vis.innerHTML = `<svg><use href="${el.visible ? '#i-eye' : '#i-eye-off'}"/></svg>`;
+    vis.addEventListener('click', e => { e.stopPropagation(); el.visible = !el.visible; renderAll(); });
+
+    const lock = document.createElement('span');
+    lock.className = 'elem-lock' + (el.locked ? ' locked' : '');
+    lock.title = 'Toggle lock';
+    lock.innerHTML = `<svg><use href="${el.locked ? '#i-lock' : '#i-lockopen'}"/></svg>`;
+    lock.addEventListener('click', e => { e.stopPropagation(); el.locked = !el.locked; saveState(); renderAll(); });
+
+    const color = document.createElement('span');
+    color.className = 'elem-color';
+    color.style.background = el.fill && el.fill !== 'none' ? el.fill : (el.stroke || '#888');
+
+    const name = document.createElement('span');
+    name.className = 'elem-name';
+    name.textContent = el.name;
+
+    item.appendChild(vis);
+    item.appendChild(lock);
+    item.appendChild(color);
+    item.appendChild(name);
+    item.addEventListener('click', e => {
+      if (e.target.closest('.elem-vis') || e.target.closest('.elem-lock')) return;
+      selectedIds = [el.id];
+      renderAll();
+    });
+    elemList.appendChild(item);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PROPERTIES PANEL
+   ═══════════════════════════════════════════ */
+const propFill = document.getElementById('prop-fill');
+const propStroke = document.getElementById('prop-stroke');
+const propStrokew = document.getElementById('prop-strokew');
+const propX = document.getElementById('prop-x');
+const propY = document.getElementById('prop-y');
+const propW = document.getElementById('prop-w');
+const propH = document.getElementById('prop-h');
+const propRot = document.getElementById('prop-rot');
+const propRx = document.getElementById('prop-rx');
+const propSides = document.getElementById('prop-sides');
+const propFillOp = document.getElementById('prop-fillop');
+const propStrokeOp = document.getElementById('prop-strokeop');
+const propBlend = document.getElementById('prop-blend');
+const valFillOp = document.getElementById('val-fillop');
+const valStrokeOp = document.getElementById('val-strokeop');
+const swatchFill = document.getElementById('swatch-fill');
+const swatchStroke = document.getElementById('swatch-stroke');
+
+function updateProperties() {
+  const el = elements.find(e => e.id === selectedIds[0]);
+  if (!el) return;
+  propFill.value = (el.fill && el.fill !== 'none') ? el.fill : '#000000';
+  propStroke.value = el.stroke || '#000000';
+  swatchFill.style.background = propFill.value;
+  swatchStroke.style.background = propStroke.value;
+  propStrokew.value = el.strokeW;
+  
+  const b = el.getBounds();
+  // Use raw coords for properties panel
+  let bx = el.x, by = el.y, bw = el.w, bh = el.h;
+  if (el.type === 'line') {
+     bx = Math.min(el.x, el.x2); by = Math.min(el.y, el.y2);
+     bw = Math.abs(el.x2 - el.x) || 8; bh = Math.abs(el.y2 - el.y) || 8;
+  }
+  propX.value = Math.round(bx);
+  propY.value = Math.round(by);
+  propW.value = Math.round(bw);
+  propH.value = Math.round(bh);
+
+  // --- PIVOT INPUTS ---
+  const pPx = document.getElementById('prop-px');
+  const pPy = document.getElementById('prop-py');
+  if(pPx) pPx.value = Math.round(el.px);
+  if(pPy) pPy.value = Math.round(el.py);
+  // --------------------
+
+  propRot.value = el.rot || 0;
+  propRx.value = el.rx || 0;
+  propSides.value = el.sides || 5;
+  propFillOp.value = Math.round((el.fillOp || 1) * 100);
+  valFillOp.textContent = propFillOp.value + '%';
+  propStrokeOp.value = Math.round((el.strokeOp || 1) * 100);
+  valStrokeOp.textContent = propStrokeOp.value + '%';
+  propBlend.value = el.blend || 'Normal';
+}
+
+/* Property input handlers */
+function onPropChange() {
+  const el = elements.find(e => e.id === selectedIds[0]);
+  if (!el) return;
+  el.fill = propFill.value;
+  el.stroke = propStroke.value;
+  el.strokeW = parseFloat(propStrokew.value) || 0;
+  swatchFill.style.background = propFill.value;
+  swatchStroke.style.background = propStroke.value;
+  renderSVG(); renderSelection();
+}
+function onPropChangeEnd() { saveState(); }
+
+propFill.addEventListener('input', onPropChange);
+propFill.addEventListener('change', onPropChangeEnd);
+propStroke.addEventListener('input', onPropChange);
+propStroke.addEventListener('change', onPropChangeEnd);
+propStrokew.addEventListener('input', onPropChange);
+propStrokew.addEventListener('change', onPropChangeEnd);
+
+propX.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  const b = el.getBounds();
+  const dx = parseFloat(propX.value) - b.x;
+  el.move(dx, 0);
+  saveState(); renderAll();
+});
+propY.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  const b = el.getBounds();
+  const dy = parseFloat(propY.value) - b.y;
+  el.move(0, dy);
+  saveState(); renderAll();
+});
+propW.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.w = Math.max(1, parseFloat(propW.value) || 1); 
+  saveState(); renderAll();
+});
+propH.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.h = Math.max(1, parseFloat(propH.value) || 1); 
+  saveState(); renderAll();
+});
+propRot.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.rot = parseFloat(propRot.value) || 0; saveState(); renderAll();
+});
+propRx.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.rx = parseFloat(propRx.value) || 0; el.ry = el.rx; saveState(); renderAll();
+});
+propSides.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.sides = Math.max(3, parseInt(propSides.value) || 5);
+  polygonSides = el.sides; saveState(); renderAll();
+});
+propFillOp.addEventListener('input', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.fillOp = parseInt(propFillOp.value) / 100;
+  valFillOp.textContent = propFillOp.value + '%';
+  renderSVG(); renderSelection();
+});
+propFillOp.addEventListener('change', onPropChangeEnd);
+propStrokeOp.addEventListener('input', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.strokeOp = parseInt(propStrokeOp.value) / 100;
+  valStrokeOp.textContent = propStrokeOp.value + '%';
+  renderSVG(); renderSelection();
+});
+propStrokeOp.addEventListener('change', onPropChangeEnd);
+propBlend.addEventListener('change', () => {
+  const el = elements.find(e => e.id === selectedIds[0]); if (!el) return;
+  el.blend = propBlend.value; saveState(); renderAll();
+});
+
+/* ═══════════════════════════════════════════
+   MASTER RENDER
+   ═══════════════════════════════════════════ */
+function renderAll() {
+  renderSVG();
+  renderSelection();
+  renderElementList();
+  updateProperties();
+}
+
+/* ═══════════════════════════════════════════
+   HIT TESTING
+   ═══════════════════════════════════════════ */
+function getArtboardPos(e) {
+  const ab = document.getElementById('artboard');
+  const r = ab.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function hitTest(mx, my) {
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (!el.visible || el.locked) continue;
+    
+    // Get bounding box
+    const b = el.getBounds();
+    
+    // For rotated elements, transform mouse point to element's local space
+    if (el.rot) {
+      const rad = -el.rot * Math.PI / 180;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      
+      // Translate mouse to pivot-relative coordinates
+      const relX = mx - el.px;
+      const relY = my - el.py;
+      
+      // Rotate back to unrotated space
+      const localX = relX * cos - relY * sin;
+      const localY = relX * sin + relY * cos;
+      
+      // Now check against local bounds
+      if (localX >= b.x - el.px && localX <= b.x + b.w - el.px &&
+          localY >= b.y - el.py && localY <= b.y + b.h - el.py) {
+        return el;
+      }
+    } else {
+      // Non-rotated: use simple bbox check
+      if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+        return el;
+      }
+    }
+  }
+  return null;
+}
+
+/* ═══════════════════════════════════════════
+   MOUSE INTERACTION — DRAW & EDIT
+   ═══════════════════════════════════════════ */
+const artboard = document.getElementById('artboard');
+let isDragging = false;
+let dragMode = null; 
+let dragStart = { x: 0, y: 0 };
+let dragElemStart = {};
+let dragHandle = '';
+let drawingElem = null;
+let freehandPoints = [];
+let marqueeEl = null;
+
+artboard.addEventListener('mousedown', onMouseDown);
+document.addEventListener('mousemove', onMouseMove);
+document.addEventListener('mouseup', onMouseUp);
+window.addEventListener('mouseup', onMouseUp);
+
+/* ═══════════════════════════════════════════
+   MOUSE DOWN HANDLER (UPDATED FOR PATHS & ELEMENTS)
+   ═══════════════════════════════════════════ */
+function onMouseDown(e) {
+  if (e.button !== 0) return; // Only left click
+  closeAllMenus();
+  
+  const pos = getArtboardPos(e);
+  const mx = pos.x, my = pos.y;
+  dragStart = { x: mx, y: my };
+
+  /* Check if clicking a selection handle OR Pivot */
+  const handleEl = e.target.closest('[data-handle]');
+  
+  if (handleEl) {
+    const handleType = handleEl.dataset.handle;
+    const index = handleEl.dataset.index !== undefined ? parseInt(handleEl.dataset.index) : -1;
+    
+    // Get the currently selected item (assuming single selection for simplicity here)
+    // If multi-select is needed, this logic would iterate selectedIds
+    const item = elements.find(e => e.id === selectedIds[0]);
+    
+    if (!item) return;
+
+    // --- PATH LOGIC (Lines & Curves) ---
+    if (item instanceof Path) {
+        const isLine = item.type === 'line';
+
+        if (handleType === 'pivot') {
+            dragMode = 'move-pivot';
+            dragItem = item;
+            // We only need the starting pivot position to calculate the delta in onMouseMove
+            // We do NOT need to store anchors here for this logic
+            dragElemStart = {
+                px: item.px, 
+                py: item.py
+            };
+            isDragging = true;
+            return;
+        }
+
+        if (handleType === 'anchor-pos') {
+            // Moving an Anchor Point
+            dragMode = 'move-anchor';
+            dragItem = item;
+            dragAnchorIndex = index;
+            isDragging = true;
+            return;
+        }
+
+      if (!isLine && (handleType === 'anchor-out' || handleType === 'anchor-in')) {
+          dragMode = 'modify-anchor-angle'; // Always use free-drag mode
+          dragItem = item;
+          dragAnchorIndex = index;
+          dragSide = handleType.split('-')[1]; // 'out' or 'in'
+          isDragging = true;
+          return;
+      }
+
+      if (handleType === 'path-move') {
+          dragMode = 'move-path';
+          dragItem = item;
+          // Store the initial mouse position (like we store startAngle for rotation)
+          dragElemStart = {
+              anchors: JSON.parse(JSON.stringify(item.anchors)), // Deep copy of anchors
+              px: item.px,
+              py: item.py,
+              startX: mx,
+              startY: my
+          };
+          isDragging = true;
+          return;
+      }
+
+      if (handleType === 'path-rotate') {
+          dragMode = 'rotate-path';
+          dragItem = item;
+          dragElemStart = {
+              rot: item.rot || 0,
+              cx: item.px,
+              cy: item.py,
+              startAngle: Math.atan2(my - item.py, mx - item.px) * 180 / Math.PI
+          };
+          isDragging = true;
+          return;
+      }
+    }
+
+    // --- ELEMENT LOGIC (Shapes: Rect, Ellipse, etc.) ---
+    else if (item instanceof Element) {
+        if (handleType === 'pivot') {
+            dragMode = 'move-pivot';
+            dragItem = item;
+            const oldCenter = item.getBounds();
+            dragElemStart = {
+                px: item.px, py: item.py,
+                offX: mx - item.px, offY: my - item.py,
+                worldCx: oldCenter.x + oldCenter.w / 2,
+                worldCy: oldCenter.y + oldCenter.h / 2
+            };
+            isDragging = true;
+            return;
+        }
+
+        if (handleType === 'rotate') {
+            dragMode = 'rotate';
+            dragItem = item;
+            dragElemStart = { 
+                rot: item.rot || 0, 
+                cx: item.px, 
+                cy: item.py 
+            }; 
+            dragElemStart.startAngle = Math.atan2(my - dragElemStart.cy, mx - dragElemStart.cx) * 180 / Math.PI;
+            isDragging = true;
+            return;
+        }
+
+        if (['nw','n','ne','w','e','sw','s','se'].includes(handleType)) {
+            dragMode = 'resize';
+            dragItem = item;
+            dragHandle = handleType;
+            dragElemStart = {
+                x: item.x, y: item.y, w: item.w, h: item.h,
+                px: item.px, py: item.py
+            };
+            isDragging = true;
+            return;
+        }
+    }
+  }
+
+  /* Tool-specific behavior (Drawing new shapes/paths) */
+  const shapeTools = ['rect', 'ellipse', 'polygon'];
+  if (shapeTools.includes(activeTool)) {
+    dragMode = 'draw';
+    const id = nextId++;
+    const base = { id, fill: defaultFill, stroke: defaultStroke, strokeW: defaultStrokeW, fillOp: 1, strokeOp: 1, blend: 'Normal', rot: 0, visible: true, locked: false };
+    
+    if (activeTool === 'polygon') {
+      drawingElem = new Element({ ...base, type: 'polygon', name: 'Polygon', x: mx, y: my, w: 0, h: 0, sides: polygonSides });
+    } else if (activeTool === 'rect') {
+      drawingElem = new Element({ ...base, type: 'rect', name: 'Rectangle', x: mx, y: my, w: 0, h: 0, rx: 0, ry: 0 });
+    } else {
+      drawingElem = new Element({ ...base, type: 'ellipse', name: 'Ellipse', x: mx, y: my, w: 0, h: 0 });
+    }
+    elements.push(drawingElem);
+    selectedIds = [id];
+    isDragging = true;
+    renderAll();
+    return;
+  }
+
+  if (activeTool === 'pen' || activeTool === 'freehand') {
+    dragMode = 'draw';
+    const id = nextId++;
+    // Create a new Path instance
+    drawingElem = new Path({
+      id, type: activeTool === 'pen' ? 'path' : 'freehand', name: 'Path', 
+      stroke: defaultFill, strokeW: defaultStrokeW || 3, fill: 'none',
+      anchors: [new Anchor(mx, my, 0, 0)] // Start with one anchor
+    });
+    freehandPoints = [{ x: mx, y: my }]; // For freehand tracking if needed
+    elements.push(drawingElem);
+    selectedIds = [id];
+    isDragging = true;
+    renderAll();
+    return;
+  }
+
+  if (activeTool === 'line') {
+    dragMode = 'draw';
+    const id = nextId++;
+    drawingElem = new Path({
+      id, type: 'line', name: 'Line', 
+      stroke: defaultStroke, strokeW: defaultStrokeW || 2, fill: 'none',
+      anchors: [new Anchor(mx, my, 0, 0), new Anchor(mx, my, 0, 0)] // Start with two overlapping anchors
+    });
+    elements.push(drawingElem);
+    selectedIds = [id];
+    isDragging = true;
+    renderAll();
+    return;
+  }
+
+  if (activeTool === 'text') {
+    const id = nextId++;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input-overlay';
+    input.style.left = mx + 'px'; input.style.top = my + 'px';
+    input.style.fontSize = '16px';
+    artboard.appendChild(input);
+    input.focus();
+    const commitText = () => {
+      const txt = input.value.trim();
+      if (txt) {
+        const measure = document.createElement('canvas').getContext('2d');
+        measure.font = '16px sans-serif';
+        const tw = measure.measureText(txt).width;
+        elements.push(new Element({
+          id, type: 'text', name: 'Text', x: mx, y: my, w: tw, h: 20,
+          fill: defaultFill, textContent: txt, fontSize: 16
+        }));
+        selectedIds = [id];
+        saveState();
+        renderAll();
+      }
+      if (input.parentNode) input.remove();
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') commitText(); if (e.key === 'Escape') input.remove(); });
+    input.addEventListener('blur', commitText);
+    return;
+  }
+
+  /* Select / Move (Standard Selection) */
+  if (activeTool === 'select' || activeTool === 'move') {
+    const hit = hitTest(mx, my);
+    if (hit) {
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        const idx = selectedIds.indexOf(hit.id);
+        if (idx >= 0) selectedIds.splice(idx, 1); else selectedIds.push(hit.id);
+      } else {
+        if (!selectedIds.includes(hit.id)) selectedIds = [hit.id];
+      }
+      if (hit.locked) { renderAll(); return; }
+      
+      // Prepare for moving the whole item
+      dragMode = 'move';
+      const moveIds = selectedIds.filter(id => {
+        const el = elements.find(e => e.id === id);
+        return el && !el.locked;
+      });
+      dragElemStart = {};
+      moveIds.forEach(id => {
+        const el = elements.find(e => e.id === id);
+        if (el instanceof Path) {
+            // For paths, we store the anchor offsets? No, we just move the whole path.
+            // We store the initial bounds to calculate delta.
+            const b = el.getBounds();
+            dragElemStart[id] = { 
+                worldX: b.x, worldY: b.y,
+                anchors: JSON.parse(JSON.stringify(el.anchors)) // Deep copy for undo/rollback if needed
+            };
+        } else {
+            dragElemStart[id] = { 
+                x: el.x, y: el.y, 
+                x2: el.x2, y2: el.y2,
+                px: el.px, py: el.py 
+            };
+        }
+      });
+      isDragging = true;
+    } else {
+        // Clear selection when clicking empty space
+        if (!(e.shiftKey || e.ctrlKey || e.metaKey)) {
+            selectedIds = [];
+            renderAll();  // Important: re-render to clear selection box
+        }
+        dragMode = 'marquee';
+        isDragging = true;
+    }
+    renderAll();
+    return;
+  }
+
+  /* Action tools (Lock, Unlock, etc.) */
+  if (activeTool === 'lock') {
+    const hit = hitTest(mx, my);
+    if (hit) { hit.locked = true; saveState(); renderAll(); showToast('Element Locked'); }
+    return;
+  }
+  if (activeTool === 'unlock') {
+    const hit = hitTest(mx, my);
+    if (hit) { hit.locked = false; saveState(); renderAll(); showToast('Element Unlocked'); }
+    return;
+  }
+  
+  // Group/Boolean tools usually require pre-selection, handled in doAction
+  if (['group','ungroup','bool-union','bool-subtract','bool-intersect','bool-exclude'].includes(activeTool)) {
+    if (selectedIds.length >= 2) {
+      doAction(activeTool);
+    } else {
+      showToast('Select 2+ elements first');
+    }
+    return;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   MOUSE MOVE HANDLER
+   ═══════════════════════════════════════════ */
+function onMouseMove(e) {
+  if (!isDragging) return;
+
+  const pos = getArtboardPos(e);
+  const mx = pos.x, my = pos.y;
+
+  // --- MARQUEE ---
+  if (dragMode === 'marquee') {
+    const lx = Math.min(dragStart.x, mx), ly = Math.min(dragStart.y, my);
+    const lw = Math.abs(mx - dragStart.x), lh = Math.abs(my - dragStart.y);
+    if (!marqueeEl) {
+      marqueeEl = document.createElement('div');
+      marqueeEl.className = 'sel-box';
+      selOverlay.appendChild(marqueeEl);
+    }
+    marqueeEl.style.left = lx + 'px';
+    marqueeEl.style.top = ly + 'px';
+    marqueeEl.style.width = lw + 'px';
+    marqueeEl.style.height = lh + 'px';
+    return;
+  }
+
+  // --- MOVE ANCHOR (paths) ---
+  if (dragMode === 'move-anchor') {
+    const el = (dragItem instanceof Path) ? dragItem : elements.find(e => e.id === selectedIds[0]);
+    if (el && el.anchors && el.anchors[dragAnchorIndex]) {
+      const anchor = el.anchors[dragAnchorIndex];
+      anchor.x = mx; anchor.y = my;
+      if (el._syncBoundsFromAnchors) el._syncBoundsFromAnchors();
+      renderSVG(); renderSelection();
+    }
+    return;
+  }
+
+  // --- MODIFY ANCHOR HANDLE (FREE DRAG) ---
+  if (dragMode === 'modify-anchor-angle') {
+    const el = (dragItem instanceof Path) ? dragItem : elements.find(e => e.id === selectedIds[0]);
+    if (el && el.anchors && el.anchors[dragAnchorIndex]) {
+      el.anchors[dragAnchorIndex].updateAngle(mx, my, dragSide);
+      renderSVG(); renderSelection();
+    }
+    return;
+  }
+
+  // --- MOVE PIVOT (elements) ---
+  if (dragMode === 'move-pivot' && dragItem instanceof Path) {
+      const el = dragItem;
+      
+      // 1. Store the OLD Pivot position
+      const oldPx = el.px;
+      const oldPy = el.py;
+      
+      // 2. Calculate the rotation in radians
+      const rad = el.rot * Math.PI / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      // 3. Update Pivot to new mouse position
+      el.px = mx;
+      el.py = my;
+
+      // 4. Update ALL anchors to preserve their VISUAL position
+      el.anchors.forEach(a => {
+          // Calculate the OLD Visual Position of this anchor
+          // V_old = OldPivot + Rotate(A_old - OldPivot, rot)
+          const relX = a.x - oldPx;
+          const relY = a.y - oldPy;
+          const vOldX = oldPx + (relX * cos - relY * sin);
+          const vOldY = oldPy + (relX * sin + relY * cos);
+
+          // Solve for A_new:
+          // A_new = NewPivot + Rotate(-rot, V_old - NewPivot)
+          const targetRelX = vOldX - el.px;
+          const targetRelY = vOldY - el.py;
+          
+          // Rotate backwards by -rot
+          const newRelX = targetRelX * cos + targetRelY * sin; // Rotate(-rot) = (cos, sin) for x, (-sin, cos) for y?
+          // Wait, Rotate(theta) = (x*cos - y*sin, x*sin + y*cos)
+          // Rotate(-theta) = (x*cos + y*sin, -x*sin + y*cos)
+          const newRelY = -targetRelX * sin + targetRelY * cos;
+
+          a.x = el.px + newRelX;
+          a.y = el.py + newRelY;
+      });
+
+      // 5. Sync bounds
+      if (el._syncBoundsFromAnchors) el._syncBoundsFromAnchors();
+
+      renderSVG();
+      renderSelection();
+      return;
+  } else if (dragMode === 'move-pivot') {
+    const el = (dragItem instanceof Element) ? dragItem : elements.find(e => e.id === selectedIds[0]);
+    if (el) {
+      const rad = el.rot * Math.PI / 180;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      const absX = el.x, absY = el.y;
+      const worldX = el.px + (absX - el.px) * cos - (absY - el.py) * sin;
+      const worldY = el.py + (absX - el.px) * sin + (absY - el.py) * cos;
+      el.px = mx - (dragElemStart && dragElemStart.offX || 0);
+      el.py = my - (dragElemStart && dragElemStart.offY || 0);
+      const ddx = worldX - el.px, ddy = worldY - el.py;
+      el.x = el.px + (ddx * cos + ddy * sin);
+      el.y = el.py + (-ddx * sin + ddy * cos);
+      renderSVG(); renderSelection(); updateProperties();
+    }
+    return;
+  }
+
+  // --- MOVE PATH ---
+  if (dragMode === 'move-path') {
+      const el = dragItem;                 // the Path being moved
+      if (!el) return;
+
+      // 1️⃣ total displacement from the original mouse‑down
+      const totalDx = mx - dragElemStart.startX;
+      const totalDy = my - dragElemStart.startY;
+
+      // 2️⃣ move every anchor based on the stored snapshot
+      el.anchors.forEach((a, i) => {
+          a.x = dragElemStart.anchors[i].x + totalDx;
+          a.y = dragElemStart.anchors[i].y + totalDy;
+      });
+
+      // 3️⃣ move the pivot the same amount
+      el.px = dragElemStart.px + totalDx;
+      el.py = dragElemStart.py + totalDy;
+
+      // 4️⃣ keep bounds in sync (if your Path class provides it)
+      if (el._syncBoundsFromAnchors) el._syncBoundsFromAnchors();
+
+      // 5️⃣ redraw the SVG path and the selection handles
+      renderSVG();          // updates the <path d="…">
+      renderSelection();    // updates move/rotate buttons and anchor handles
+      return;
+  }
+
+
+  // --- ROTATE PATH ---
+  if (dragMode === 'rotate-path') {
+      const el = dragItem;
+      if (el) {
+          const angle = Math.atan2(my - dragElemStart.cy, mx - dragElemStart.cx) * 180 / Math.PI;
+          let newRot = dragElemStart.rot + (angle - dragElemStart.startAngle);
+          if (e.shiftKey) newRot = Math.round(newRot / 15) * 15;
+          el.rot = ((newRot % 360) + 360) % 360;
+          if (el.rot > 180) el.rot -= 360;
+          renderSVG(); renderSelection(); updateProperties();
+      }
+      return;
+  }
+
+  // --- DRAWING (shapes/paths/freehand) ---
+  if (dragMode === 'draw' && drawingElem) {
+    if (drawingElem instanceof Path) {
+      if (drawingElem.type === 'line') {
+        if (drawingElem.anchors.length === 1) {
+            drawingElem.anchors.push(new Anchor(mx, my, 0, 0));
+        }
+        const start = drawingElem.anchors[0];
+        let finalX = mx;
+        let finalY = my;
+        if (e && e.ctrlKey) {
+            const dx = mx - start.x;
+            const dy = my - start.y;
+            const dist = Math.hypot(dx, dy);
+            let angle = Math.atan2(dy, dx);
+            const snapAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+            finalX = start.x + Math.cos(snapAngle) * dist;
+            finalY = start.y + Math.sin(snapAngle) * dist;
+        }
+        drawingElem.anchors[1].x = finalX;
+        drawingElem.anchors[1].y = finalY;
+      } else {
+        const last = drawingElem.anchors[drawingElem.anchors.length - 1];
+        if (Math.hypot(mx - last.x, my - last.y) > 5) {
+          drawingElem.anchors.push(new Anchor(mx, my, 0, 0));
+        }
+      }
+    } else if (drawingElem instanceof Element) {
+      drawingElem.updateDraw(mx, my);
+      if (drawingElem.type === 'freehand') {
+        freehandPoints.push({ x: mx, y: my });
+        drawingElem.d = `M${freehandPoints[0].x} ${freehandPoints[0].y} L${mx} ${my}`;
+      }
+    }
+    renderSVG(); renderSelection();
+    return;
+  }
+
+  // --- MOVE (elements) ---
+  if (dragMode === 'move') {
+    // For standard element move, we still need dx/dy relative to start
+    // But we must calculate it from the original dragStart, not the mutated one
+    // Since we removed the global mutation, dragStart is still the original click position!
+    const dx = mx - dragStart.x;
+    const dy = my - dragStart.y;
+    
+    selectedIds.forEach(id => {
+      const s = dragElemStart[id];
+      if (!s) return;
+      const el = elements.find(e => e.id === id);
+      if (!el || el.locked) return;
+      el.x = s.x + dx; el.y = s.y + dy;
+      if (s.px !== undefined) el.px = s.px + dx;
+      if (s.py !== undefined) el.py = s.py + dy;
+      if (el.type === 'line') { el.x2 = s.x2 + dx; el.y2 = s.y2 + dy; }
+    });
+    renderSVG(); renderSelection(); updateProperties();
+    return;
+  }
+
+  // --- RESIZE (elements) ---
+  if (dragMode === 'resize') {
+    const el = (dragItem instanceof Element) ? dragItem : elements.find(e => e.id === selectedIds[0]);
+    if (!el) return;
+    // Calculate dx/dy from original start
+    const dx = mx - dragStart.x;
+    const dy = my - dragStart.y;
+    
+    if (el.type === 'line') {
+      el.x2 = dragElemStart.x2 + dx; el.y2 = dragElemStart.y2 + dy;
+      el.updateDraw && el.updateDraw(el.x2, el.y2);
+    } else {
+      el.setBounds(dragHandle, dragElemStart, dx, dy);
+    }
+    renderSVG(); renderSelection(); updateProperties();
+    return;
+  }
+
+  // --- ROTATE (elements) ---
+  if (dragMode === 'rotate') {
+    const el = (dragItem instanceof Element) ? dragItem : elements.find(e => e.id === selectedIds[0]);
+    if (!el) return;
+    const angle = Math.atan2(my - dragElemStart.cy, mx - dragElemStart.cx) * 180 / Math.PI;
+    let newRot = dragElemStart.rot + (angle - dragElemStart.startAngle);
+    if (e.shiftKey) newRot = Math.round(newRot / 15) * 15;
+    el.rot = ((newRot % 360) + 360) % 360;
+    if (el.rot > 180) el.rot -= 360;
+    renderSVG(); renderSelection(); updateProperties();
+    return;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   MOUSE UP HANDLER (UPDATED FOR PATHS & ELEMENTS)
+   ═══════════════════════════════════════════ */
+function onMouseUp(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  
+  let pos;
+  
+  // --- MARQUEE SELECTION ---
+  if (dragMode === 'marquee') {
+    pos = getArtboardPos(e);
+    if (marqueeEl) { marqueeEl.remove(); marqueeEl = null; }
+    
+    const lx = Math.min(dragStart.x, pos.x), ly = Math.min(dragStart.y, pos.y);
+    const lw = Math.abs(pos.x - dragStart.x), lh = Math.abs(pos.y - dragStart.y);
+    
+    if (lw > 3 || lh > 3) {
+      const inside = elements.filter(el => {
+        if (!el.visible || el.locked) return false;
+        const b = el.getBounds();
+        return b.x >= lx && b.y >= ly && b.x + b.w <= lx + lw && b.y + b.h <= ly + lh;
+      }).map(el => el.id);
+      selectedIds = inside;
+    }
+    dragMode = null;
+    saveState();
+    renderAll();
+    return;
+  }
+
+  // --- DRAWING (SHAPES OR PATHS) ---
+  if (dragMode === 'draw' && drawingElem) {
+    // Validate the drawn shape/path
+    if (drawingElem instanceof Path) {
+        // For Paths, check if we have enough anchors
+        if (drawingElem.anchors.length < 2) {
+            // If less than 2 anchors, it's a dot or invalid line, remove it
+            const idx = elements.indexOf(drawingElem);
+            if (idx > -1) {
+                elements.splice(idx, 1);
+                selectedIds = [];
+            }
+        } else {
+            // Ensure pivot is set for the new path
+            drawingElem._updatePivot();
+        }
+    } else if (drawingElem instanceof Element) {
+        // For Shapes, check minimum size
+        const b = drawingElem.getBounds();
+        if (drawingElem.type !== 'line' && drawingElem.type !== 'freehand') {
+            if (b.w < 3 && b.h < 3) {
+                const idx = elements.indexOf(drawingElem);
+                if (idx > -1) {
+                    elements.splice(idx, 1);
+                    selectedIds = [];
+                }
+            }
+        }
+    }
+    
+    drawingElem = null;
+    freehandPoints = [];
+  }
+
+  // --- SAVE STATE FOR ANY COMPLETED ACTION ---
+  // We save state if we performed a move, resize, rotate, or anchor edit
+  if (dragMode && dragMode !== 'draw' && dragMode !== 'marquee') {
+    saveState();
+    renderSelection(); 
+  }
+
+  // Reset all drag variables
+  dragMode = null;
+  dragItem = null;
+  dragAnchorIndex = -1;
+  dragSide = null;
+  dragElemStart = {};
+  // No need to reset dragStartRadius or dragStartAngle anymore as we aren't locking
+  
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════
+   EXPORT SVG FUNCTION
+   ═══════════════════════════════════════════ */
+function exportSVG() {
+  // 1. Build the SVG content string
+  let svgContent = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  svgContent += `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">\n`;
+  
+  // 2. Iterate through elements and generate SVG nodes
+  for (const item of elements) {
+    if (!item.visible) continue;
+    
+    let nodeStr = '';
+    
+    // --- HANDLE PATHS ---
+    if (item instanceof Path) {
+        const d = item.getPathString();
+        if (!d) continue; // Skip empty paths
+        
+        nodeStr += `  <path d="${d}" `;
+        nodeStr += `stroke="${item.stroke}" stroke-width="${item.strokeW}" `;
+        nodeStr += `stroke-opacity="${item.strokeOp}" `;
+        nodeStr += `fill="${item.fill}" fill-opacity="${item.fillOp}" `;
+        nodeStr += `stroke-linecap="round" stroke-linejoin="round"`;
+        
+        if (item.blend && item.blend !== 'Normal') {
+            nodeStr += ` style="mix-blend-mode: ${item.blend}"`;
+        }
+        
+        if (item.rot) {
+            nodeStr += ` transform="rotate(${item.rot}, ${item.px}, ${item.py})"`;
+        }
+        
+        nodeStr += '/>\n';
+    }
+    // --- HANDLE ELEMENTS (SHAPES) ---
+    else if (item instanceof Element) {
+        switch (item.type) {
+            case 'rect':
+                nodeStr += `  <rect x="${item.x}" y="${item.y}" `;
+                nodeStr += `width="${Math.max(1, item.w)}" height="${Math.max(1, item.h)}"`;
+                if (item.rx) nodeStr += ` rx="${item.rx}"`;
+                if (item.ry) nodeStr += ` ry="${item.ry}"`;
+                break;
+            case 'ellipse':
+                nodeStr += `  <ellipse cx="${item.x + item.w / 2}" cy="${item.y + item.h / 2}" `;
+                nodeStr += `rx="${Math.max(0.5, item.w / 2)}" ry="${Math.max(0.5, item.h / 2)}"`;
+                break;
+            case 'polygon': {
+                const pts = polygonPoints(item.x, item.y, item.w, item.h, item.sides || 5);
+                nodeStr += `  <polygon points="${pts}"`;
+                break;
+            }
+            case 'text':
+                nodeStr += `  <text x="${item.x}" y="${item.y + item.h}" `;
+                nodeStr += `font-size="${item.fontSize || 16}" fill="${item.fill !== 'none' ? item.fill : '#000'}"`;
+                nodeStr += `>${escapeXml(item.textContent || 'Text')}</text>\n`;
+                // Text is handled separately, skip generic attributes below
+                if (item.rot) {
+                     // Text rotation is tricky in simple export, skipping for now or applying transform
+                     // For simplicity, we'll just output the text as is or with transform if needed
+                     // Let's apply transform if rot exists
+                     nodeStr = `  <text x="${item.x}" y="${item.y + item.h}" `;
+                     nodeStr += `font-size="${item.fontSize || 16}" fill="${item.fill !== 'none' ? item.fill : '#000'}"`;
+                     if (item.rot) nodeStr += ` transform="rotate(${item.rot}, ${item.px}, ${item.py})"`;
+                     nodeStr += `>${escapeXml(item.textContent || 'Text')}</text>\n`;
+                }
+                svgContent += nodeStr;
+                continue; // Continue to next item
+        }
+        
+        if (nodeStr) {
+            if (item.fill && item.fill !== 'none') {
+                nodeStr += ` fill="${item.fill}" fill-opacity="${item.fillOp}"`;
+            } else {
+                nodeStr += ` fill="none"`;
+            }
+            if (item.strokeW > 0) {
+                nodeStr += ` stroke="${item.stroke}" stroke-width="${item.strokeW}" stroke-opacity="${item.strokeOp}" stroke-linecap="round" stroke-linejoin="round"`;
+            }
+            if (item.blend && item.blend !== 'Normal') {
+                nodeStr += ` style="mix-blend-mode: ${item.blend}"`;
+            }
+            if (item.rot) {
+                nodeStr += ` transform="rotate(${item.rot}, ${item.px}, ${item.py})"`;
+            }
+            nodeStr += '/>\n';
+        }
+    }
+    
+    if (nodeStr) svgContent += nodeStr;
+  }
+  
+  svgContent += `</svg>`;
+
+  // 3. Create Blob and Download
+  const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `webvg-export-${Date.now()}.svg`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  
+  showToast('SVG Exported');
+}
+
+// Helper to escape XML special characters in text content
+function escapeXml(unsafe) {
+  return unsafe.replace(/[<>&'"]/g, function (c) {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════
+   ACTIONS
+   ═══════════════════════════════════════════ */
+function doAction(action) {
+  switch (action) {
+    case 'new': elements = []; selectedIds = []; nextId = 1; undoStack = []; redoStack = []; saveState(); renderAll(); showToast('New Document'); break;
+    case 'save': showToast('Saved'); break;
+    case 'saveas': showToast('Save As'); break;
+    case 'cut': doCut(); break;
+    case 'copy': doCopy(); break;
+    case 'paste': doPaste(); break;
+    case 'duplicate': doDuplicate(); break;
+    case 'delete': doDelete(); break;
+    case 'selectall': selectedIds = elements.filter(e => !e.locked).map(e => e.id); renderAll(); break;
+    case 'move-front': doReorder('front'); break;
+    case 'move-up': doReorder('up'); break;
+    case 'move-down': doReorder('down'); break;
+    case 'move-back': doReorder('back'); break;
+    case 'lock': selectedIds.forEach(id => { const el = elements.find(e => e.id === id); if (el) el.locked = true; }); saveState(); renderAll(); showToast('Locked'); break;
+    case 'unlock-all': elements.forEach(el => el.locked = false); saveState(); renderAll(); showToast('All Unlocked'); break;
+    case 'group': showToast('Group — select 2+ elements'); break;
+    case 'ungroup': showToast('Ungroup'); break;
+    case 'bool-union': case 'bool-subtract': case 'bool-intersect': case 'bool-exclude':
+      showToast((action.replace('bool-','')) + ' — requires 2+ closed paths'); break;
+    case 'export-svg':
+      exportSVG();
+      break;
+    default: showToast(action);
+  }
+}
+
+function doDelete() {
+  if (!selectedIds.length) return;
+  elements = elements.filter(e => !selectedIds.includes(e.id));
+  selectedIds = [];
+  saveState(); renderAll(); showToast('Deleted');
+}
+
+function doCopy() {
+  if (!selectedIds.length) return;
+  clipboard = elements.filter(e => selectedIds.includes(e.id)).map(e => ({ ...e }));
+  showToast('Copied');
+}
+
+function doCut() {
+  doCopy();
+  doDelete();
+}
+
+function doPaste() {
+  if (!clipboard || !clipboard.length) return;
+  const offset = 20;
+  const newIds = [];
+  clipboard.forEach(src => {
+    const config = { ...src, id: nextId++, name: src.name + ' copy' };
+    config.x += offset; config.y += offset;
+    if (config.x2 !== undefined) { config.x2 += offset; config.y2 += offset; }
+    if (config.px !== undefined) { config.px += offset; config.py += offset; } // Offset pivot too
+    const el = new Element(config);
+    elements.push(el);
+    newIds.push(el.id);
+  });
+  selectedIds = newIds;
+  saveState(); renderAll(); showToast('Pasted');
+}
+
+function doDuplicate() {
+  if (!selectedIds.length) return;
+  const offset = 20;
+  const newIds = [];
+  selectedIds.forEach(sid => {
+    const src = elements.find(e => e.id === sid);
+    if (!src) return;
+    const config = { ...src, id: nextId++, name: src.name + ' copy' };
+    config.x += offset; config.y += offset;
+    if (config.x2 !== undefined) { config.x2 += offset; config.y2 += offset; }
+    if (config.px !== undefined) { config.px += offset; config.py += offset; } // Offset pivot too
+    const el = new Element(config);
+    elements.push(el);
+    newIds.push(el.id);
+  });
+  selectedIds = newIds;
+  saveState(); renderAll(); showToast('Duplicated');
+}
+
+function doReorder(dir) {
+  for (const id of selectedIds) {
+    const idx = elements.findIndex(e => e.id === id);
+    if (idx < 0) continue;
+    if (dir === 'up' && idx < elements.length - 1) {
+      [elements[idx], elements[idx + 1]] = [elements[idx + 1], elements[idx]];
+    } else if (dir === 'down' && idx > 0) {
+      [elements[idx], elements[idx - 1]] = [elements[idx - 1], elements[idx]];
+    } else if (dir === 'front') {
+      const [el] = elements.splice(idx, 1); elements.push(el);
+    } else if (dir === 'back') {
+      const [el] = elements.splice(idx, 1); elements.unshift(el);
+    }
+  }
+  saveState(); renderAll();
+}
+
+/* ═══════════════════════════════════════════
+   MENU SYSTEM
+   ═══════════════════════════════════════════ */
+const menuItems = document.querySelectorAll('.menu-item[data-menu]');
+const overlay = document.getElementById('menu-overlay');
+let activeMenu = null, menuTimeout = null;
+
+function openMenu(item) {
+  closeAllMenus();
+  const dd = item.querySelector('.dropdown');
+  if (!dd) return;
+  dd.classList.add('show'); item.classList.add('open');
+  activeMenu = item; overlay.classList.add('show');
+}
+function closeAllMenus() {
+  clearTimeout(menuTimeout);
+  document.querySelectorAll('.dropdown.show').forEach(d => d.classList.remove('show'));
+  document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+  activeMenu = null; overlay.classList.remove('show');
+}
+menuItems.forEach(item => {
+  item.addEventListener('click', e => { e.stopPropagation(); item.classList.contains('open') ? closeAllMenus() : openMenu(item); });
+  item.addEventListener('mouseenter', () => { if (activeMenu && activeMenu !== item) { clearTimeout(menuTimeout); openMenu(item); } });
+});
+overlay.addEventListener('click', closeAllMenus);
+document.querySelectorAll('.dd-item[data-action]').forEach(item => {
+  item.addEventListener('click', e => {
+    e.stopPropagation();
+    if (item.querySelector('.submenu')) return;
+    closeAllMenus();
+    doAction(item.dataset.action);
+  });
+});
+
+/* ═══════════════════════════════════════════
+   TOAST
+   ═══════════════════════════════════════════ */
+let toastEl = null;
+function showToast(msg) {
+  if (toastEl) toastEl.remove();
+  toastEl = document.createElement('div');
+  toastEl.textContent = msg.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  Object.assign(toastEl.style, {
+    position:'fixed', bottom:'32px', left:'50%', transform:'translateX(-50%)',
+    background:'#2d2d30', color:'#ccc', padding:'6px 16px', borderRadius:'6px',
+    fontSize:'12px', border:'1px solid #454545', boxShadow:'0 4px 16px rgba(0,0,0,0.4)',
+    zIndex:'9999', opacity:'0', transition:'opacity 0.2s', pointerEvents:'none'
+  });
+  document.body.appendChild(toastEl);
+  requestAnimationFrame(() => toastEl.style.opacity = '1');
+  setTimeout(() => { if (toastEl) { toastEl.style.opacity = '0'; setTimeout(() => toastEl && toastEl.remove(), 200); } }, 1800);
+}
+
+/* ═══════════════════════════════════════════
+   TOOL SELECTION
+   ═══════════════════════════════════════════ */
+const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+
+function setTool(tool) {
+  activeTool = tool;
+  toolBtns.forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+  artboard.className = 'artboard tool-' + tool;
+  if (['lock','unlock','group','ungroup','bool-union','bool-subtract','bool-intersect','bool-exclude'].includes(tool)) {
+    setTimeout(() => setTool('select'), 50);
+  }
+}
+toolBtns.forEach(btn => btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+
+const toolKeys = { v:'select', r:'rect', e:'ellipse', p:'polygon', l:'line', w:'freehand', n:'pen', x:'text' };
+
+/* ═══════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+   ═══════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+  const ctrl = e.ctrlKey || e.metaKey;
+  const shift = e.shiftKey;
+
+  if (ctrl && e.key === 'z' && !shift) { e.preventDefault(); undo(); return; }
+  if (ctrl && e.key === 'z' && shift) { e.preventDefault(); redo(); return; }
+  if (ctrl && e.key === 'Z') { e.preventDefault(); redo(); return; }
+  if (ctrl && e.key === 'x') { e.preventDefault(); doCut(); return; }
+  if (ctrl && e.key === 'c') { e.preventDefault(); doCopy(); return; }
+  if (ctrl && e.key === 'v') { e.preventDefault(); doPaste(); return; }
+  if (ctrl && e.key === 'd') { e.preventDefault(); doDuplicate(); return; }
+  if (ctrl && e.key === 'a') { e.preventDefault(); doAction('selectall'); return; }
+  if (ctrl && e.key === 'l') { e.preventDefault(); doAction('lock'); return; }
+  if (ctrl && shift && e.key === 'L') { e.preventDefault(); doAction('unlock-all'); return; }
+  if (ctrl && e.key === ']') { e.preventDefault(); doReorder(shift ? 'front' : 'up'); return; }
+  if (ctrl && e.key === '[') { e.preventDefault(); doReorder(shift ? 'back' : 'down'); return; }
+
+  if (e.key === 'Delete' || e.key === 'Backspace') { doDelete(); return; }
+  if (e.key === 'Escape') { selectedIds = []; renderAll(); return; }
+
+  // Arrow keys to move selected elements
+  const arrowStep = shift ? 10 : 1; // Shift for faster movement
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault();
+    const dx = e.key === 'ArrowLeft' ? -arrowStep : (e.key === 'ArrowRight' ? arrowStep : 0);
+    const dy = e.key === 'ArrowUp' ? -arrowStep : (e.key === 'ArrowDown' ? arrowStep : 0);
+    
+    selectedIds.forEach(id => {
+      const el = elements.find(e => e.id === id);
+      if (el && !el.locked) el.move(dx, dy);
+    });
+    saveState();
+    renderAll();
+    return;
+  }
+
+  const tool = toolKeys[e.key.toLowerCase()];
+  if (tool) { setTool(tool); return; }
+});
+
+/* ═══════════════════════════════════════════
+   RIGHT FLYOUT
+   ═══════════════════════════════════════════ */
+const rightPanel = document.getElementById('RIGHT'), flyout = document.getElementById('right-flyout');
+let flyoutTimeout = null;
+rightPanel.addEventListener('mouseenter', () => { clearTimeout(flyoutTimeout); flyout.classList.add('show'); });
+rightPanel.addEventListener('mouseleave', () => { flyoutTimeout = setTimeout(() => { if (!flyout.matches(':hover')) flyout.classList.remove('show'); }, 200); });
+flyout.addEventListener('mouseleave', () => { flyoutTimeout = setTimeout(() => { if (!rightPanel.matches(':hover')) flyout.classList.remove('show'); }, 200); });
+flyout.addEventListener('mouseenter', () => { clearTimeout(flyoutTimeout); });
+
+/* Section Collapse */
+document.querySelectorAll('.section-head').forEach(head => {
+  head.addEventListener('click', () => head.closest('.section').classList.toggle('collapsed'));
+});
+
+/* Property Buttons */
+document.querySelectorAll('.prop-btn[data-panel]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const s = document.querySelector(`.section[data-section="${btn.dataset.panel}"]`);
+    if (s) {
+      if (s.classList.contains('collapsed')) s.classList.remove('collapsed');
+      s.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
+});
+
+/* --- PIVOT INPUTS --- */
+const propPx = document.getElementById('prop-px');
+const propPy = document.getElementById('prop-py');
+
+if (propPx) {
+  propPx.addEventListener('change', () => {
+    const el = elements.find(e => e.id === selectedIds[0]);
+    if (!el) return;
+    el.px = parseFloat(propPx.value) || 0;
+    saveState(); renderAll();
+  });
+}
+
+if (propPy) {
+  propPy.addEventListener('change', () => {
+    const el = elements.find(e => e.id === selectedIds[0]);
+    if (!el) return;
+    el.py = parseFloat(propPy.value) || 0;
+    saveState(); renderAll();
+  });
+}
+/* ------------------- */
+
+/* ═══════════════════════════════════════════
+   ELEMENT LIST HEADER BUTTONS
+   ═══════════════════════════════════════════ */
+document.getElementById('btn-elem-add').addEventListener('click', () => {
+  const id = nextId++;
+  elements.push(new Element({
+    id, type:'rect', name:'Rectangle ' + id, x:40, y:40, w:100, h:80, rx:0, ry:0,
+    fill: defaultFill, stroke: defaultStroke, strokeW: defaultStrokeW
+  }));
+  selectedIds = [id];
+  saveState(); renderAll();
+});
+
+document.getElementById('btn-folder-add').addEventListener('click', () => {
+  showToast('Folder — coming soon');
+});
+
+document.getElementById('btn-elem-del').addEventListener('click', () => {
+  doDelete();
+});
+
+/* ═══════════════════════════════════════════
+   DRAG & DROP FILES
+   ═══════════════════════════════════════════ */
+let dropIndicator = null;
+document.addEventListener('dragover', e => {
+  e.preventDefault();
+  if (!dropIndicator) {
+    dropIndicator = document.createElement('div');
+    Object.assign(dropIndicator.style, {
+      position:'fixed', inset:'0', zIndex:'10000',
+      background:'rgba(232,166,52,0.06)', border:'2px dashed var(--accent)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      pointerEvents:'none', color:'var(--accent)', fontSize:'16px',
+      fontWeight:'600', letterSpacing:'1px'
+    });
+    dropIndicator.textContent = 'DROP TO OPEN OR IMPORT';
+    document.body.appendChild(dropIndicator);
+  }
+});
+document.addEventListener('dragleave', e => {
+  if (e.relatedTarget === null && dropIndicator) { dropIndicator.remove(); dropIndicator = null; }
+});
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  if (dropIndicator) { dropIndicator.remove(); dropIndicator = null; }
+  const f = e.dataTransfer.files;
+  if (f.length) {
+    const n = f[0].name, x = n.split('.').pop().toLowerCase();
+    showToast(x === 'svg' ? 'Open SVG: ' + n : ['png','jpg','jpeg','gif','bmp','webp'].includes(x) ? 'Import Image: ' + n : 'Import File: ' + n);
+  }
+});
+
+/* ═══════════════════════════════════════════
+   CONTEXT MENU SUPPRESS
+   ═══════════════════════════════════════════ */
+document.getElementById('app').addEventListener('contextmenu', e => e.preventDefault());
+
+/* ═══════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════ */
+initElements();
+renderAll();
+setTool('select');
+</script>
+</body>
+</html>
