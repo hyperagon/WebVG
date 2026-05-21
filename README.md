@@ -8,7 +8,6 @@ Features:
 - No Dependencies
 - Shapes (Rectangle, Ellipse, Text)
 - Line
-- Brush
 - Re-order Objects
 
 TODO:
