@@ -1,13 +1,5 @@
 <!--
-    Implement these features:
-      - Adding an Anchor on double-clicking the Path segment
-      - Removing a non-edge Anchor on double-clicking it or Ctrl+clicking it
-    
-    Find out and fix why I can't add Anchors when double-clicking a Path segment
-    
-    When I delete a Path then undo it fails at getControlPoints, give me that method. (function undo and function redo)
-    
-    going nuclear are we? let's get serious, screw doubleclick event, 2 mousedown in the same spot, you already detect them so do that
+    Moving an Anchor resets the Pivot to the center of the Path. (added _syncBoundsFromAnchors to class Path)
     
     Tell me what parts to update.
 -->
@@ -15,7 +7,7 @@
 <html lang="en">
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebVG 3.29</title>
+<title>WebVG 3.30</title>
 <style>
   *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
@@ -902,6 +894,27 @@ class Path {
         }
 
         return d;
+    }
+    
+    _syncBoundsFromAnchors() {
+        if (this.anchors.length === 0) return;
+        
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        this.anchors.forEach(a => {
+            minX = Math.min(minX, a.x);
+            minY = Math.min(minY, a.y);
+            maxX = Math.max(maxX, a.x);
+            maxY = Math.max(maxY, a.y);
+        });
+
+        this.x = minX;
+        this.y = minY;
+        this.w = maxX - minX;
+        this.h = maxY - minY;
+        
+        // THIS RESETS THE PIVOT TO CENTER
+        this.px = this.x + this.w / 2;
+        this.py = this.y + this.h / 2;
     }
 }
    
