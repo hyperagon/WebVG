@@ -14,7 +14,7 @@ Features:
 
 TODO:
 - Groups
-- Line-rail (Ctrl)
+- Line-rail (Ctrl) [Not worth it, we got Pen for that]
 - Path (Free-hand Line)
 - Path-rail (Ctrl)
 - Fill
