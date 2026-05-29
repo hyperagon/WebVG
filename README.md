@@ -8,15 +8,15 @@ Features:
 - No Dependencies
 - Shapes (Rectangle, Ellipse, Text)
 - Line
+- Pen (multiple lines/curves)
 - Re-order Objects
+- Edit Line/Path Edges
 
 TODO:
 - Groups
 - Line-rail (Ctrl)
 - Path (Free-hand Line)
 - Path-rail (Ctrl)
-- Edit Line/Path Edges
-- - Draw insid Element
 - Fill
 - Onion Skin
 - Animation
