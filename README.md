@@ -12,12 +12,13 @@ Features:
 - Re-order Objects
 - Edit Line/Path Edges
 - Path (Free-hand Line)
+- New
+- Save to JSON
+- Load from JSON
+- Export to BMP,PNG,JPEG,WebP
 - Onion Skin
 - Animation
-- Export to BMP,PNB,JPEG,WebP
-- Export to WebM
-- Export to SVG+Smil
-- Export to DVG+CSS
+- Export to WebM, SVG+Smil, SVG+CSS
 
 TODO:
 - Group
