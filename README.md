@@ -14,9 +14,14 @@ Features:
 - Path (Free-hand Line)
 - Onion Skin
 - Animation
+- Export to BMP,PNB,JPEG,WebP
+- Export to WebM
+- Export to SVG+Smil
+- Export to DVG+CSS
 
 TODO:
 - Group
+- Scale Test (repeat the animation of a scale, Jaiden did one with smilies and frownies)
 - Bell Test (repeat the animation done in Friction of a Bell)
 - Lock
 - Boolean actions (Union, Subtract, Intersect, Division)
