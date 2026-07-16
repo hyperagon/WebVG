@@ -1,13 +1,23 @@
 <!--
+    Why does Deleting a Group that is not on Edit mode ungroup it? It's supposed to delete it.
     
+    the instant I click on the timeline it reverts all deletions, it's supposed to overwirte the frames
+    
+    why do I have to reset a pivot to the center of a Shape after I made it? It should be centered after it is made, also the timeline freezes the pivot and does not maintain it.
+    
+    making new Elements isn't adding them to the timeline now?
+    
+    what happens is, I draw an element, it shows up but the timeline while it has it is reverted when I click it instead of overwriting the clicked frame
+    
+    it's changing the size WHEN I click the frame in the timeline, it has nothing to do with drawing
 
-    Make minimal changes to avoid altering other functionalities and ell me what parts to update and add comments so future editors know exactly WHY things exist and WHAT they do. (mouseUp after DRAG MODE RESET)
+    Make minimal changes to avoid altering other functionalities and tell me what parts to update and add comments so future editors know exactly WHY things exist and WHAT they do.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebVG 4.25</title>
+<title>WebVG 4.26</title>
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 :root { --bg-dark: #1e1e1e; --bg-panel: #252526; --bg-hover: #2a2d2e; --bg-active: #37373d; --border: #3c3c3c; --text-dim: #5a5a5a; --text-muted: #9e9e9e; --text-bright: #cccccc; --accent: #e8a634; --accent-hover: #f0b84e; --accent-dim: rgba(232,166,52,0.12); --menu-bg: #2d2d30; --menu-hover: #094771; --scroller: #424242; --scroller-hover: #4f4f4f; }
@@ -1051,7 +1061,7 @@ class Shape extends Element {
     }
   }
 
-  updateDraw(mx, my) {
+updateDraw(mx, my) {
      if (this.type === 'line') {
        this.x2 = mx; this.y2 = my;
        this.x = Math.min(this.x, this.x2);
@@ -1069,7 +1079,10 @@ class Shape extends Element {
        if (mx < this.x) this.x = mx;
        if (my < this.y) this.y = my;
      }
-  }
+     
+     // ADD THIS: Keep pivot centered as the shape grows
+     this._updatePivot();
+}
   containsPoint(wx, wy) {
     const local = this.inverseLocalize(wx, wy);
     const b = this.getBounds();
@@ -2995,6 +3008,8 @@ function goToFrame(index) {
     updateScrubber();
     renderTimeline();
     applyFrameFromData(currentFrameIndex);
+    renderElementList();  // ← ADD THIS to preserve element list UI
+    updateProperties();   // ← ADD THIS too
 }
 
 function saveFrameState(frameIndex, elementId = null) {
@@ -3237,6 +3252,10 @@ function renderFramePreview(targetIndex) {
 }
 
 function applyFrameFromData(targetFrameIndex) {
+    if(DEBUG) { console.log('=== APPLY FRAME ===', targetFrameIndex); }
+    if(DEBUG) { console.log('Target row:', timelineData[targetFrameIndex]); }
+    if(DEBUG) { console.log('ElementFrames:', timelineData[targetFrameIndex]?.elementFrames); }
+    
     if (!timelineData[targetFrameIndex]) {
         console.error("Frame index out of bounds:", targetFrameIndex);
         return;
@@ -3337,6 +3356,9 @@ function applyFrameFromData(targetFrameIndex) {
     renderSelection();
     renderOnionSkin();
     updateProperties();
+    
+   if(DEBUG) { console.log(newElements.length); }
+   if(DEBUG) { console.log('Elements:', newElements.map(e => ({id: e.id, name: e.name}))); }
 }
 
 // Helper: Process a Frame object into a usable state object
@@ -5844,13 +5866,14 @@ function updateProperties() {
  *      the user explicitly creates one (Ctrl+K or clicking a timeline cell).
  */
 function syncPropsToKeyframe() {
-    const el = elements.find(e => e.id === selectedIds[0]);
+    if (!focusedElementId) return;
+    const el = elements.find(e => e.id === focusedElementId);
     if (!el) return;
-
+    
+    // Only sync if we actually changed properties
     const frame = timelineData[currentFrameIndex];
     if (!frame || !frame.elementFrames) return;
-
-    // Only update if there's already a keyframe here — don't auto-create one
+    
     const existingKf = frame.elementFrames.get(el.id);
     if (existingKf && existingKf.type === 'keyframe') {
         const freshKF = Frame.createKeyframe(currentFrameIndex, el);
@@ -6589,7 +6612,10 @@ if (clickedEl instanceof Group) {
     if (activeTool === 'polygon') drawingElem = new Shape({ ...base, type: 'polygon', name: 'Polygon ' + id, x: mx, y: my, w: 0, h: 0, sides: polygonSides });
     else if (activeTool === 'rect') drawingElem = new Shape({ ...base, type: 'rect', name: 'Rectangle ' + id, x: mx, y: my, w: 0, h: 0, rx: 0, ry: 0 });
     else drawingElem = new Shape({ ...base, type: 'ellipse', name: 'Ellipse ' + id, x: mx, y: my, w: 0, h: 0 });
-    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll(); return;
+    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll();
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
+    return;
   }
 
   if (activeTool === 'line') {
@@ -6599,7 +6625,10 @@ if (clickedEl instanceof Group) {
         id, type: 'line', name: 'Line ' + id, stroke: defaultStroke, strokeW: defaultStrokeW || 2, fill: 'none',
         anchors: [new Anchor(mx, my, 0, 0), new Anchor(mx, my, 0, 0)]
     });
-    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll(); return;
+    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll();
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
+    return;
   }
 
   if (activeTool === 'path') {
@@ -6610,7 +6639,10 @@ if (clickedEl instanceof Group) {
         anchors: [new Anchor(mx, my, 0, 0)]
     });
     drawingElem.isDrawing = true;
-    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll(); return;
+    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll();
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
+    return;
   }
 
   if (activeTool === 'pen') {
@@ -6634,6 +6666,8 @@ if (clickedEl instanceof Group) {
         isDragging = true;
         dragMode = 'draw';
         renderAll();
+        ensureFrameIsKeyframe(currentFrameIndex);
+        renderTimeline();
         return;
     }
     dragMode = 'draw';
@@ -6665,6 +6699,8 @@ if (clickedEl instanceof Group) {
     };
     input.addEventListener('keydown', e => { if (e.key === 'Enter') commitText(); if (e.key === 'Escape') input.remove(); });
     input.addEventListener('blur', commitText);
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
     return;
   }
 
@@ -7421,33 +7457,26 @@ if (dragMode === 'rotate') {
    3. Save state (captures final position + NEW pivot)
    4. Render once with final data
    ═══════════════════════════════════════════ */
-/* ===============================================
-   FULL onMouseUp() FUNCTION - REPLACE ENTIRELY
-=============================================== */
 function onMouseUp(e) {
   if (e.button !== 0) return;
 
-  // ── Pan view cleanup: reset drag state and exit early ──────────────
-  // Must return before the rest of onMouseUp, which calls hitTest and
-  // other element logic that would be meaningless (and wasteful) after panning.
+  // Pan mode cleanup
   if (dragMode === 'pan') {
     dragMode = null;
     isDragging = false;
     return;
   }
-  
-  // ✅ Get coordinates locally
+
   const pos = getArtboardCoords(e.clientX, e.clientY);
   const mx = pos.x;
   const my = pos.y;
-  const hit = hitTest(mx, my);  // 👈 LOCAL HIT
-  
-  // Calculate distance moved during click/drag
+  const hit = hitTest(mx, my);
+
   const dx = Math.abs(mx - dragStart.x);
   const dy = Math.abs(my - dragStart.y);
   const distMoved = dx + dy;
-  
-  /* ==================== GROUP EDIT EXIT LOGIC ==================== */
+
+  // Check for all editing groups
   const allEditingGroups = elements.filter(g => g instanceof Group && g.isEditing);
   
   for (const editingGroup of allEditingGroups) {
@@ -7459,51 +7488,36 @@ function onMouseUp(e) {
                            my >= gBounds.y - TOLERANCE && 
                            my <= gBounds.y + gBounds.h + TOLERANCE);
     
-    // Use LOCAL 'hit' variable
     const hitChildGroup = hit !== null && hit instanceof Group && !hit.isEditing;
     
     if (!clickedInside && !hitChildGroup) {
-      // Truly outside everything - safe to exit
       editingGroup.isEditing = false;
       selectedIds = [editingGroup.id];
-      
       saveState();
       renderAll();
       renderTimeline();
       showToast("Exited Group Edit Mode");
       return;
     } else if (hitChildGroup) {
-      // User clicked on child group - keep parent edit mode active
       continue;
     }
   }
   
-  /* ==================== DRAG MODE RESET ==================== */
+  const wasDrawing = (dragMode === 'draw');
   dragMode = null;
-  resizeHandle = null;
 
-  // ── Marquee selection ──────────────────────────────────────────────
-  // The marquee box is drawn in onMouseMove, but actual element selection
-  // happens here on mouse-up. We compute the marquee rectangle from
-  // dragStart (set in onMouseDown) and the current mouse position (mx/my,
-  // computed at the top of onMouseUp via getArtboardCoords), then select
-  // every visible, unlocked element whose bounding box intersects it.
-  //
-  // selectedIds was already cleared in onMouseDown when the marquee began
-  // (unless Shift/Ctrl was held to add to an existing selection), so we
-  // push rather than replace.
+  // MARQUEE SELECTION CLEANUP
   if (marqueeEl) {
     const mqX = Math.min(dragStart.x, mx);
     const mqY = Math.min(dragStart.y, my);
     const mqW = Math.abs(mx - dragStart.x);
     const mqH = Math.abs(my - dragStart.y);
 
-    // Only select on a real drag, not a bare click on empty space
     if (mqW > 1 || mqH > 1) {
       elements.forEach(el => {
         if (!el.visible || el.locked) return;
         const b = el.getBounds();
-        // AABB intersection test
+        
         if (mqX < b.x + b.w && mqX + mqW > b.x &&
             mqY < b.y + b.h && mqY + mqH > b.y) {
           if (!selectedIds.includes(el.id)) {
@@ -7513,50 +7527,28 @@ function onMouseUp(e) {
       });
     }
 
-    // Remove the visual marquee box and re-render to show selection handles
     marqueeEl.remove();
     marqueeEl = null;
     renderAll();
   }
-  
-  /* ==================== PEN TOOL HANDLING ==================== */
-  if (activeTool === 'pen') {
-    if (!currentPath) return;
+
+  // DRAWING MODE FINALIZATION
+  if (wasDrawing && drawingElem) {
+    drawingElem._updatePivot();
+    drawingElem.isNewTempElement = false;
     
-    const pathCloseTolerance = 20;
+    // Overwrite the zero-size keyframe from onMouseDown with real dimensions
+    ensureFrameIsKeyframe(currentFrameIndex);
     
-    if (currentPath.points.length > 2 && 
-        Math.hypot(mx - currentPath.startX, my - currentPath.startY) < pathCloseTolerance) {
-      currentPath.closed = true;
-      currentPath.isNewTempElement = false;
-      elements.push(currentPath);
-      selectedIds = [currentPath.id];
-      focusedElementId = currentPath.id;
-      currentPath = null;
-      drawPointCount = 0;
-      
-      ensureFrameIsKeyframe(currentFrameIndex);
-      saveState();
-      renderAll();
-      renderTimeline();
-      return;
-    }
+    saveState();
+    renderAll();
+    renderTimeline();
+    drawingElem = null;
+    isDragging = false;
     return;
   }
-  
-  /* ==================== DRAWING TOOL ==================== */
-  if (activeTool === 'draw') {
-    if (tempDrawingShape) {
-      tempDrawingShape.isNewTempElement = false;
-      currentPath = null;
-      drawPointCount = 0;
-      ensureFrameIsKeyframe(currentFrameIndex);
-      saveState();
-      renderAll();
-      renderTimeline();
-    }
-    return;
-  }
+
+  isDragging = false;
 }
 
 /* --- FILE OPERATIONS --- */
@@ -8637,33 +8629,75 @@ function pruneDeletedElementsFromTimeline(deletedId) {
   });
 }
 
-function doDelete() {
-  if (!selectedIds.length) return;
-  
-  const deletedIds = [...selectedIds];
-  
-  // 1. Remove from main elements array
-  elements = elements.filter(e => !deletedIds.includes(e.id));
-  
-  // 2. ALSO REMOVE FROM ANY GROUP'S CHILDREN ARRAY
-  elements.forEach(el => {
-    if (el instanceof Group && Array.isArray(el.children)) {
-      el.children = el.children.filter(child => !deletedIds.includes(child.id));
+function pruneDeletedElementsFromTimeline(deletedId) {
+  // Clean up BOTH the elementFrames Map AND any legacy elements array
+  for (let f = 0; f < timelineData.length; f++) {
+    const frame = timelineData[f];
+    
+    // Remove from elementFrames Map (THIS IS THE IMPORTANT ONE)
+    if (frame.elementFrames && frame.elementFrames.has(deletedId)) {
+      frame.elementFrames.delete(deletedId);
     }
-  });
-  
-  selectedIds = [];
-  focusedElementId = null;
-  
-  // 3. Remove from Timeline History
-  deletedIds.forEach(id => {
-    pruneDeletedElementsFromTimeline(id);
-  });
+    
+    // Remove from frames array if it exists
+    if (frame.frames && frame.frames.length > 0) {
+      frame.frames = frame.frames.filter(frm => frm.elementId !== deletedId);
+    }
+    
+    // Legacy cleanup (for backwards compatibility)
+    if (frame.elements) {
+      frame.elements = frame.elements.filter(el => el.id !== deletedId);
+    }
+  }
+}
 
-  saveState(); 
-  renderAll(); 
-  renderTimeline();
-  showToast('Deleted');
+function getAllDescendantIds(groupId) {
+    const ids = [groupId];
+    const group = elements.find(e => e.id === groupId);
+    
+    if (group instanceof Group && group.children) {
+        group.children.forEach(childId => {
+            const child = elements.find(e => e.id === childId);
+            if (child) {
+                ids.push(...getAllDescendantIds(childId));
+            }
+        });
+    }
+    
+    return ids;
+}
+
+function doDelete() {
+    
+    // Collect ALL descendant IDs (including nested groups and their children)
+    const allIdsToDelete = [];
+    selectedIds.forEach(id => {
+        allIdsToDelete.push(...getAllDescendantIds(id));
+    });
+    
+    // CLEAN TIMELINE FIRST (before touching elements array)
+    allIdsToDelete.forEach(id => {
+        pruneDeletedElementsFromTimeline(id);
+    });
+    
+    // Then remove from elements array
+    elements = elements.filter(e => !allIdsToDelete.includes(e.id));
+    
+    // Clean up parent references in remaining groups
+    elements.forEach(el => {
+        if (el instanceof Group && Array.isArray(el.children)) {
+            el.children = el.children.filter(childId => !allIdsToDelete.includes(childId));
+        }
+    });
+    
+    // Clear selections
+    selectedIds = [];
+    focusedElementId = null;
+    
+    saveState();
+    renderAll();
+    renderTimeline();
+    showToast('Deleted');
 }
 
 function doCopy() {

@@ -1,38 +1,19 @@
 <!--
-    After a while the path gets garbled, please fix it.
+    there sure is a lot of dead code in this, clean it up (left i-folderplus)
     
-    Garbled:
-    <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
-  <path d="M 276.1 154.6 C 321.8 134.4, 455.8 206.0, 451.4 255.8 C 490.5 287.1, 472.6 265.0, 487.9 312.6 C 438.0 311.4, 407.9 261.9, 452.6 284.2 C 466.5 332.3, 482.9 295.8, 457.5 338.8 C 426.6 378.1, 441.6 354.6, 438.6 304.6 C 438.5 354.6, 464.0 302.6, 434.9 343.2 C 393.8 314.8, 378.8 327.9, 428.8 327.9 C 410.9 374.6, 366.9 366.5, 319.0 351.9 C 270.5 364.0, 270.4 369.5, 249.8 323.9 C 219.8 284.0, 237.7 186.6, 276.1 154.6 C 326.1 154.6, 226.1 154.6, 276.1 154.6 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#f66151" fill-opacity="0.26" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 312.0 279.8 C 265.5 261.5, 223.5 263.2, 249.5 305.9 C 253.7 355.8, 285.6 296.9, 295.8 345.8 C 334.9 314.6, 340.8 320.8, 312.0 279.8 C 362.0 279.8, 262.0 279.8, 312.0 279.8 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#ffbe6f" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 320.1 289.1 C 343.0 333.6, 350.3 322.1, 301.5 333.1 C 292.6 284.0, 237.3 349.3, 254.7 302.4 C 296.9 275.5, 271.5 277.4, 320.1 289.1 C 370.1 289.1, 270.1 289.1, 320.1 289.1 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#530e16" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 313.7 276.4 C 358.8 298.2, 337.9 271.3, 343.8 320.9 C 333.6 369.9, 327.6 352.3, 277.8 356.8 C 307.5 316.6, 318.0 326.3, 313.7 276.4 C 363.7 276.4, 263.7 276.4, 313.7 276.4 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#ffbe6f" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 416.1 247.4 C 427.3 296.2, 417.9 234.7, 421.3 284.5 C 466.5 263.0, 416.8 318.3, 431.8 270.6 C 444.8 222.3, 459.9 271.6, 416.1 247.4 C 466.1 247.4, 366.1 247.4, 416.1 247.4 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#530e16" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 403.4 347.6 C 387.1 394.9, 420.6 329.3, 384.3 363.6 C 434.3 363.6, 380.6 402.3, 406.1 359.3 C 415.9 310.3, 436.1 385.5, 403.4 347.6 C 453.4 347.6, 353.4 347.6, 403.4 347.6 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#530e16" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
-
-    Ungarbled:
-    <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
-  <path d="M 276.1 155.8 C 332.2 130.9, 460.7 151.1, 451.4 257.0 C 480.4 280.2, 478.4 284.3, 487.9 313.8 C 463.6 313.2, 451.4 284.8, 452.6 285.4 C 455.9 296.8, 464.4 328.3, 457.5 340.0 C 452.3 346.6, 439.6 322.9, 438.6 305.8 C 438.5 332.4, 435.4 343.7, 434.9 344.4 C 431.0 341.7, 428.8 329.1, 428.8 329.1 C 408.8 381.0, 351.8 363.1, 319.0 353.1 C 294.5 359.2, 267.8 365.1, 249.8 325.1 C 213.9 277.3, 246.5 180.4, 276.1 155.8 L 276.1 155.8 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#f66151" fill-opacity="0.26" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 312.0 281.0 C 291.4 272.9, 241.4 293.8, 249.5 307.1 C 250.6 320.4, 290.5 321.6, 295.8 347.0 C 318.9 328.5, 328.7 304.8, 312.0 281.0 L 312.0 281.0 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#ffbe6f" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 320.1 290.3 C 329.3 308.2, 321.8 329.7, 301.5 334.3 C 299.8 325.0, 250.6 314.6, 254.7 303.6 C 275.5 290.3, 301.0 285.7, 320.1 290.3 L 320.1 290.3 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#530e16" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 313.7 277.6 C 330.5 285.7, 341.5 303.0, 343.8 322.1 C 338.0 349.9, 296.3 356.3, 277.8 358.0 C 292.3 338.3, 316.0 304.8, 313.7 277.6 L 313.7 277.6 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#ffbe6f" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 416.1 248.6 C 418.1 257.3, 420.8 278.4, 421.3 285.7 C 425.5 283.7, 428.9 281.0, 431.8 271.8 C 435.2 259.1, 420.8 251.2, 416.1 248.6 L 416.1 248.6 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#530e16" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 403.4 348.8 C 399.6 359.8, 390.0 359.4, 384.3 364.8 C 391.7 364.8, 401.7 367.9, 406.1 360.5 C 406.9 356.5, 405.9 351.7, 403.4 348.8 L 403.4 348.8 Z" stroke="#e8a634" stroke-width="3" stroke-opacity="1" fill="#530e16" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
-
-    Make minimal changes to avoid altering other functionalities and tell me what parts to update and add comments so future editors know exactly WHY things exist and WHAT they do.
+    clicking on a selected Frame cell should overwrite and interpolate it, it's working for Shapes
     
     Human Intervention:
-      - Re-add Ctrl+0/1/5 shortcuts and remove the Ctrl
+      - Reverted onmouseup (pen and path were broken)
+      - Removed dead code (DRAWING TOOL on mouseup)
+      
+    Make minimal changes to avoid altering other functionalities and tell me what parts to update and add comments so future editors know exactly WHY things exist and WHAT they do.
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebVG 4.24</title>
+<title>WebVG 4.27</title>
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 :root { --bg-dark: #1e1e1e; --bg-panel: #252526; --bg-hover: #2a2d2e; --bg-active: #37373d; --border: #3c3c3c; --text-dim: #5a5a5a; --text-muted: #9e9e9e; --text-bright: #cccccc; --accent: #e8a634; --accent-hover: #f0b84e; --accent-dim: rgba(232,166,52,0.12); --menu-bg: #2d2d30; --menu-hover: #094771; --scroller: #424242; --scroller-hover: #4f4f4f; }
@@ -792,7 +773,6 @@ input[type="range"].field-ctrl { flex: 1; accent-color: var(--accent); cursor: p
     <span class="title">Elements</span>
     <div class="actions">
       <button title="New Element" aria-label="New element" id="btn-elem-add"><svg><use href="#i-plus"/></svg></button>
-      <button title="New Folder" aria-label="New folder" id="btn-folder-add"><svg><use href="#i-folderplus"/></svg></button>
       <button title="Delete Element" aria-label="Delete element" id="btn-elem-del"><svg><use href="#i-trash"/></svg></button>
     </div>
   </div>
@@ -901,26 +881,21 @@ class Element {
   constructor(config = {}) {
     this.id = config.id || 0;
     this.name = config.name || 'Element';
-    this.parent = null; // Will point to parent Group ID or null
-    
-    // --- TRANSFORM STATE (Owned by Element) ---
-    this.x = config.x || 0;           // Local Origin X (Top-Left of unrotated bounds)
-    this.y = config.y || 0;           // Local Origin Y
-    this.px = config.px !== undefined ? config.px : (config.x || 0); // Pivot X
-    this.py = config.py !== undefined ? config.py : (config.y || 0); // Pivot Y
-    this.rot = config.rot || 0;       // Rotation in degrees
-    
-    // --- NODE STATE ---
+    this.parent = null; 
+    this.x = config.x || 0;
+    this.y = config.y || 0;
+    this.px = config.px !== undefined ? config.px : (config.x || 0); 
+    this.py = config.py !== undefined ? config.py : (config.y || 0); 
+    this.rot = config.rot || 0;
     this.visible = config.visible !== false;
     this.locked = config.locked || false;
-    
-    // --- APPEARANCE (Defaults, overridden by subclasses) ---
     this.fill = config.fill || '#e8a634';
     this.stroke = config.stroke || '#000000';
     this.strokeW = config.strokeW || 0;
     this.fillOp = config.fillOp !== undefined ? config.fillOp : 1;
     this.strokeOp = config.strokeOp !== undefined ? config.strokeOp : 1;
     this.blend = config.blend || 'Normal';
+    this.fillRule = config.fillRule || 'nonzero';
   }
 
   /**
@@ -1081,7 +1056,7 @@ class Shape extends Element {
     }
   }
 
-  updateDraw(mx, my) {
+updateDraw(mx, my) {
      if (this.type === 'line') {
        this.x2 = mx; this.y2 = my;
        this.x = Math.min(this.x, this.x2);
@@ -1099,7 +1074,10 @@ class Shape extends Element {
        if (mx < this.x) this.x = mx;
        if (my < this.y) this.y = my;
      }
-  }
+     
+     // ADD THIS: Keep pivot centered as the shape grows
+     this._updatePivot();
+}
   containsPoint(wx, wy) {
     const local = this.inverseLocalize(wx, wy);
     const b = this.getBounds();
@@ -1820,13 +1798,14 @@ function applyStyles(node, element) {
     const k = key.trim();
     const v = value.trim();
     
-    // 🔴 ADD THESE MISSING HANDLERS
     if (k === 'fill') element.fill = v;
     if (k === 'stroke') element.stroke = v;
     if (k === 'stroke-width') element.strokeW = parseFloat(v) || 0;
     if (k === 'fill-opacity') element.fillOp = parseFloat(v);
     if (k === 'stroke-opacity') element.strokeOp = parseFloat(v);
-    if (k === 'opacity') element.fillOp = parseFloat(v); // Apply to fill by default
+    if (k === 'opacity') element.fillOp = parseFloat(v);
+    if (k === 'fill-rule') element.fillRule = v;
+    if (k === 'visibility') element.visible = (v === 'visible');
   });
 }
 
@@ -1837,6 +1816,10 @@ function applyStyles(node, element) {
  * CORRECTION: Does NOT clear existing elements—adds imported ones to the current scene
  */
 function parseSVG(svgString) {
+  if (!svgString || typeof svgString !== 'string') {
+    console.warn('[parseSVG] Empty input');
+    return [];
+  }
   const parser = new DOMParser();
   const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
   
@@ -1956,14 +1939,13 @@ function parseSVG(svgString) {
           fill: getAttr(node, 'fill') ?? 'black',
           stroke: getAttr(node, 'stroke') ?? 'none',
           strokeW: parseFloat(getAttr(node, 'stroke-width') || 0),
+          fillRule: getAttr(node, 'fill-rule') || 'nonzero',
           parent: parentId
         });
         break;
         
       case 'polygon':
       case 'polyline':
-        // ✅ FIX 3: Direct Anchor Building (Bypasses parseSVGPathData)
-        // We build the anchors directly to prevent any path-parsing bugs from mangling straight lines.
         const ptsStr = node.getAttribute('points');
         if (!ptsStr) break;
         const ptsRaw = parsePolygonPoints(ptsStr);
@@ -2000,6 +1982,7 @@ function parseSVG(svgString) {
             fill: getAttr(node, 'fill') ?? (tagName === 'polygon' ? 'black' : 'none'),
             stroke: getAttr(node, 'stroke') ?? 'none',
             strokeW: parseFloat(getAttr(node, 'stroke-width') || 0),
+            fillRule: getAttr(node, 'fill-rule') || 'nonzero',
             parent: parentId
         });
         break;
@@ -2189,26 +2172,6 @@ function applyTransform(node, element) {
     element.scaleX = sx;
     element.scaleY = sy;
   }
-}
-
-// Helper: Apply inline styles
-function applyStyles(node, element) {
-  const style = node.getAttribute('style');
-  if (!style) return;
-  
-  const pairs = style.split(';');
-  pairs.forEach(pair => {
-    const [key, value] = pair.split(':');
-    if (!key || !value) return;
-    
-    const k = key.trim();
-    const v = value.trim();
-    
-    if (k === 'fill-opacity') element.fillOp = parseFloat(v);
-    if (k === 'stroke-opacity') element.strokeOp = parseFloat(v);
-    if (k === 'opacity') element.fillOp = parseFloat(v);
-    if (k === 'visibility') element.visible = (v === 'visible');
-  });
 }
 
 // Helper: Parse polygon points string
@@ -2921,22 +2884,19 @@ function renderTimeline() {
 cell.addEventListener('click', (e) => {
   e.stopPropagation();
 
-  // 1. Check if we are already AT this frame
   const isCurrentFrame = (f === currentFrameIndex);
-  
-  // 2. Check EXPLICIT state in the Map
   const frameData = timelineData[f]?.elementFrames?.get(el.id);
-  const isExplicitInterpolation = frameData && (frameData.type === 'interpolation' || frameData.type === 'difference');
-  
-  // 3. CHECK FOR IMPLICIT INTERPOLATION
+  const isExplicitInterpolation = frameData && frameData.type === 'interpolation';
+
+  // Check for implicit interpolation
   let isImplicitInterpolation = false;
   if (!frameData) {
     let prevExists = false;
     let nextExists = false;
-    
+
     for (let i = f - 1; i >= 0; i--) {
       if (timelineData[i]?.elementFrames?.has(el.id)) {
-        prevExists = true; 
+        prevExists = true;
         break;
       }
     }
@@ -2946,81 +2906,63 @@ cell.addEventListener('click', (e) => {
         break;
       }
     }
-    
+
     if (prevExists && nextExists) {
       isImplicitInterpolation = true;
     }
   }
 
   const isFocusedElement = (focusedElementId === el.id);
-  const isInterpolationType = isExplicitInterpolation || isImplicitInterpolation;
-  const hasKeyframeOrInterp = isInterpolationType || (frameData && frameData.type === 'keyframe');
 
-  // --- NEW LOGIC START ---
-  // If we are on this frame, we focused the element, BUT there is NO keyframe/interp here yet:
-  // -> Just create the keyframe immediately on this click.
-if (isCurrentFrame && isFocusedElement && !hasKeyframeOrInterp) {
-    // Get the ACTUAL element from the global elements[] array (may have canvas edits)
-    const el = elements.find(e => e.id === focusedElementId);
-    if (el) {
-        // Create keyframe with CURRENT state (includes any color/opacity changes made)
-        const freshKF = Frame.createKeyframe(currentFrameIndex, el);
-        timelineData[currentFrameIndex].elementFrames.set(focusedElementId, freshKF);
-        if (!timelineData[currentFrameIndex].frames) {
-            timelineData[currentFrameIndex].frames = [];
-        }
-        if (!timelineData[currentFrameIndex].frames.some(f => f.elementId === focusedElementId)) {
-            timelineData[currentFrameIndex].frames.push(freshKF);
-        }
-        lastKnownBaseState[focusedElementId] = freshKF.fullState;
-        
-        renderTimeline();
-        showToast("Keyframe created");
-        return;
+  // If the clicked element is focused, save/update its state
+  if (isFocusedElement) {
+    const clickedEl = elements.find(e => e.id === focusedElementId);
+    if (clickedEl) {
+      // Ensure timelineData[f] exists
+      if (!timelineData[f]) {
+        timelineData[f] = { elementFrames: new Map(), frames: [] };
+      }
+      if (!timelineData[f].elementFrames) {
+        timelineData[f].elementFrames = new Map();
+      }
+
+      // Create a keyframe from the CURRENT state of the element
+      // (not from its initial state or frame 0)
+      const freshKF = Frame.createKeyframe(f, clickedEl);
+      timelineData[f].elementFrames.set(focusedElementId, freshKF);
+      lastKnownBaseState[focusedElementId] = freshKF.fullState;
+
+      // Ensure frames array exists
+      if (!timelineData[f].frames) {
+        timelineData[f].frames = [];
+      }
+
+      // Remove old keyframe for this element (if any)
+      timelineData[f].frames = timelineData[f].frames.filter(kf => kf.elementId !== focusedElementId);
+      timelineData[f].frames.push(freshKF);
+
+      renderTimeline();
+      showToast(isCurrentFrame ? "Keyframe updated" : `Keyframe saved to frame ${f + 1}`);
+
+      // Only navigate if we're on a DIFFERENT frame
+      if (!isCurrentFrame) {
+        goToFrame(f);
+      }
+      return;
     }
-}
-
-// 🔴 FIX: Same logic for converting interpolations to keyframes
-if (isCurrentFrame && isInterpolationType && isFocusedElement) {
-    const el = elements.find(e => e.id === focusedElementId);
-    if (el) {
-        const freshKF = Frame.createKeyframe(currentFrameIndex, el);
-        timelineData[currentFrameIndex].elementFrames.set(focusedElementId, freshKF);
-        if (!timelineData[currentFrameIndex].frames) {
-            timelineData[currentFrameIndex].frames = [];
-        }
-        // Replace existing frame data for this element
-        timelineData[currentFrameIndex].frames = timelineData[currentFrameIndex].frames.filter(f => f.elementId !== focusedElementId);
-        timelineData[currentFrameIndex].frames.push(freshKF);
-        lastKnownBaseState[focusedElementId] = freshKF.fullState;
-        
-        renderTimeline();
-        showToast("Converted to Keyframe");
-        return;
-    }
-}
-  // --- NEW LOGIC END ---
-
-  // ORIGINAL LOGIC (Preserved):
-  // If I am ALREADY on this frame AND it's an interpolated frame (explicit or implicit) AND I clicked it again:
-  // -> Convert it to a Keyframe now (Double-click behavior).
-  if (isCurrentFrame && isInterpolationType && isFocusedElement) {
-    ensureFrameIsKeyframe(currentFrameIndex);
-    showToast("Converted to Keyframe");
-    renderTimeline(); 
-    return; 
   }
 
-  // OTHERWISE: Just navigate to this frame
+  // If the frame is implicitly interpolated and the element is focused, convert it to a keyframe
+  if (isCurrentFrame && isImplicitInterpolation && isFocusedElement) {
+    ensureFrameIsKeyframe(currentFrameIndex);
+    showToast("Converted to Keyframe");
+    renderTimeline();
+    return;
+  }
+
+  // Default: Navigate to the clicked frame
   goToFrame(f);
 });
-
-      // Hover effect to preview interpolation (Optional enhancement)
-      cell.addEventListener('mouseenter', () => {
-        if (frameType === 'interpolation' && frameData) {
-           // Optional: Show tooltip or highlight
-        }
-      });
 
       cellsContainer.appendChild(cell);
     }
@@ -3040,6 +2982,8 @@ function goToFrame(index) {
     updateScrubber();
     renderTimeline();
     applyFrameFromData(currentFrameIndex);
+    renderElementList();  // ← ADD THIS to preserve element list UI
+    updateProperties();   // ← ADD THIS too
 }
 
 function saveFrameState(frameIndex, elementId = null) {
@@ -3071,7 +3015,6 @@ function saveFrameState(frameIndex, elementId = null) {
             elementId: changedEl.id
         });
 
-        // Track base state for difference frames
         lastKnownBaseState[changedEl.id] = changedSnapshot;
     });
 
@@ -3216,62 +3159,59 @@ function renderFramePreview(targetIndex) {
 
     // Process each known element
     allIds.forEach(id => {
-        let finalState = null;
-        
-        // A. Check EXACT frame first
-        if (targetRow && targetRow.elementFrames && targetRow.elementFrames.has(id)) {
-            const kf = targetRow.elementFrames.get(id);
-            if (kf.fullState) finalState = deepCloneState(kf.fullState);
-            else if (kf.deltas) finalState = deepCloneState(kf.deltas); // Fallback
+    let finalState = null;
+
+    // CRITICAL: CHECK EXPLICIT KEYFRAME AT THIS FRAME FIRST
+    if (targetRow.elementFrames?.has(id)) {
+        const kf = targetRow.elementFrames.get(id);
+        if (kf.type === 'keyframe' && kf.fullState) {
+            finalState = deepCloneState(kf.fullState);
+        } else if (kf.deltas && lastKnownBaseState[id]) {
+            finalState = { ...lastKnownBaseState[id], ...kf.deltas };
         }
-        
-        // B. Interpolate / Hold if no exact match
-        if (!finalState) {
-            let prevKf = null, nextKf = null;
-            let prevIdx = -1, nextIdx = -1;
-            
-            // Search BACKWARDS all the way to 0
-            for (let i = targetIndex - 1; i >= 0; i--) {
-                if (timelineData[i].elementFrames?.has(id)) {
-                    prevKf = timelineData[i].elementFrames.get(id);
+    }
+
+    // Only interpolate if NO explicit keyframe at this frame
+    if (!finalState) {
+        let prevKf = null, nextKf = null;
+        let prevIdx = -1, nextIdx = -1;
+
+        for (let i = targetFrameIndex - 1; i >= 0; i--) {
+            if (timelineData[i]?.elementFrames?.has(id)) {
+                const check = timelineData[i].elementFrames.get(id);
+                if (check.type === 'keyframe') {
+                    prevKf = check.fullState;
                     prevIdx = i;
-                    break; // Found the nearest previous
+                    break;
                 }
             }
-            
-            // Search FORWARD all the way to end
-            for (let i = targetIndex + 1; i < totalFrames; i++) {
-                if (timelineData[i].elementFrames?.has(id)) {
-                    nextKf = timelineData[i].elementFrames.get(id);
+        }
+
+        for (let i = targetFrameIndex + 1; i < totalFrames; i++) {
+            if (timelineData[i]?.elementFrames?.has(id)) {
+                const check = timelineData[i].elementFrames.get(id);
+                if (check.type === 'keyframe') {
+                    nextKf = check.fullState;
                     nextIdx = i;
-                    break; // Found the nearest future
+                    break;
                 }
             }
-            
-            // LOGIC FIX: If we have a previous OR a next, show it!
-            if (prevKf && nextKf) {
-                // Standard interpolation
-                const progress = (targetIndex - prevIdx) / (nextIdx - prevIdx);
-                finalState = interpolateState(prevKf.fullState, nextKf.fullState, progress);
-            } 
-            else if (prevKf) {
-                // HOLD: No future keyframe found, but we have a past one. 
-                // Show the PAST value (it hasn't moved yet).
-                finalState = deepCloneState(prevKf.fullState);
-            } 
-            else if (nextKf) {
-                // PULL FROM FUTURE: We are before the first keyframe.
-                // Most anim software shows the future value early, OR fades it in.
-                // To prevent disappearing, we show the future value immediately.
-                finalState = deepCloneState(nextKf.fullState);
-            }
-            // If NEITHER exists (shouldn't happen since we scanned all frames), finalState remains null
         }
-        
-        if (finalState) {
-            previewElements.push(reconstructElement(finalState));
+
+        if (prevKf && nextKf) {
+            const progress = (targetFrameIndex - prevIdx) / (nextIdx - prevIdx);
+            finalState = interpolateState(prevKf, nextKf, progress);
+        } else if (prevKf) {
+            finalState = deepCloneState(prevKf);
+        } else if (nextKf) {
+            finalState = deepCloneState(nextKf);
         }
-    });
+    }
+
+    if (finalState) {
+        newElements.push(reconstructElement(finalState));
+    }
+});
     
     // Render the result
     elements = previewElements;
@@ -3282,6 +3222,10 @@ function renderFramePreview(targetIndex) {
 }
 
 function applyFrameFromData(targetFrameIndex) {
+    if(DEBUG) { console.log('=== APPLY FRAME ===', targetFrameIndex); }
+    if(DEBUG) { console.log('Target row:', timelineData[targetFrameIndex]); }
+    if(DEBUG) { console.log('ElementFrames:', timelineData[targetFrameIndex]?.elementFrames); }
+    
     if (!timelineData[targetFrameIndex]) {
         console.error("Frame index out of bounds:", targetFrameIndex);
         return;
@@ -3382,6 +3326,9 @@ function applyFrameFromData(targetFrameIndex) {
     renderSelection();
     renderOnionSkin();
     updateProperties();
+    
+   if(DEBUG) { console.log(newElements.length); }
+   if(DEBUG) { console.log('Elements:', newElements.map(e => ({id: e.id, name: e.name}))); }
 }
 
 // Helper: Process a Frame object into a usable state object
@@ -3766,6 +3713,7 @@ function renderOnionFrame(elementsData, container, opacity) {
           if (e.fillOp !== undefined) {
             node.setAttribute('fill-opacity', parseFloat(e.fillOp));
           }
+          node.setAttribute('fill-rule', e.fillRule || 'nonzero');
         } else {
           node.setAttribute('fill', 'none');
         }
@@ -4314,7 +4262,6 @@ function renderSVG() {
       node = document.createElementNS(svgNS, 'path');
       node.setAttribute('d', item.getPathString());
       
-      // CRITICAL: Apply rotation around Pivot
       if (item.rot !== 0) {
         node.setAttribute('transform', `rotate(${item.rot}, ${item.px}, ${item.py})`);
       }
@@ -4324,6 +4271,7 @@ function renderSVG() {
       node.setAttribute('stroke-opacity', item.strokeOp);
       node.setAttribute('fill', item.fill);
       node.setAttribute('fill-opacity', item.fillOp);
+      node.setAttribute('fill-rule', item.fillRule || 'nonzero');
       node.setAttribute('stroke-linecap', 'round');
       node.setAttribute('stroke-linejoin', 'round');
       node.style.pointerEvents = 'visiblePainted';
@@ -5452,7 +5400,7 @@ async function exportSMILSVG() {
 
             // 🔴 FIX: Set EXACT initial values on the tag
             if (type === 'path' || type === 'line') {
-                tagStart = `  <path id="el-${elId}" d="${generatePathD(startS)}" fill="${startS.fill}" stroke="${startS.stroke}" stroke-width="${startS.strokeW}"`;
+                tagStart = `  <path id="el-${elId}" d="${generatePathD(startS)}" fill="${startS.fill}" stroke="${startS.stroke}" stroke-width="${startS.strokeW}" fill-rule="${startS.fillRule || 'nonzero'}"`;
                 if (startS.fillOp < 1) tagStart += ` fill-opacity="${startS.fillOp}"`;
                 tagEnd = `  </path>\n`;
             } else if (type === 'rect') {
@@ -5708,8 +5656,11 @@ keyframeSteps.push(`${pct}% { transform: ${transformStr}; transform-origin: ${or
       if (!hasAnimation) {
           let elemTag = '';
           const attrs = [`id="el-${elId}"`, `class="${className}"`];
-          if (initialState.fill) attrs.push(`fill="${initialState.fill}"`);
-          if (initialState.fillOp < 1) attrs.push(`fill-opacity="${initialState.fillOp}"`);
+              if (initialState.fill) attrs.push(`fill="${initialState.fill}"`);
+              if (initialState.fillRule && initialState.fillRule !== 'nonzero') {
+                  attrs.push(`fill-rule="${initialState.fillRule}"`);
+              }
+              if (initialState.fillOp < 1) attrs.push(`fill-opacity="${initialState.fillOp}"`);
           if (initialState.strokeW > 0) attrs.push(`stroke="${initialState.stroke}"`, `stroke-width="${initialState.strokeW}"`);
           if (initialState.strokeOp < 1) attrs.push(`stroke-opacity="${initialState.strokeOp}"`);
           
@@ -5885,13 +5836,14 @@ function updateProperties() {
  *      the user explicitly creates one (Ctrl+K or clicking a timeline cell).
  */
 function syncPropsToKeyframe() {
-    const el = elements.find(e => e.id === selectedIds[0]);
+    if (!focusedElementId) return;
+    const el = elements.find(e => e.id === focusedElementId);
     if (!el) return;
-
+    
+    // Only sync if we actually changed properties
     const frame = timelineData[currentFrameIndex];
     if (!frame || !frame.elementFrames) return;
-
-    // Only update if there's already a keyframe here — don't auto-create one
+    
     const existingKf = frame.elementFrames.get(el.id);
     if (existingKf && existingKf.type === 'keyframe') {
         const freshKF = Frame.createKeyframe(currentFrameIndex, el);
@@ -6630,7 +6582,10 @@ if (clickedEl instanceof Group) {
     if (activeTool === 'polygon') drawingElem = new Shape({ ...base, type: 'polygon', name: 'Polygon ' + id, x: mx, y: my, w: 0, h: 0, sides: polygonSides });
     else if (activeTool === 'rect') drawingElem = new Shape({ ...base, type: 'rect', name: 'Rectangle ' + id, x: mx, y: my, w: 0, h: 0, rx: 0, ry: 0 });
     else drawingElem = new Shape({ ...base, type: 'ellipse', name: 'Ellipse ' + id, x: mx, y: my, w: 0, h: 0 });
-    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll(); return;
+    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll();
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
+    return;
   }
 
   if (activeTool === 'line') {
@@ -6640,7 +6595,10 @@ if (clickedEl instanceof Group) {
         id, type: 'line', name: 'Line ' + id, stroke: defaultStroke, strokeW: defaultStrokeW || 2, fill: 'none',
         anchors: [new Anchor(mx, my, 0, 0), new Anchor(mx, my, 0, 0)]
     });
-    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll(); return;
+    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll();
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
+    return;
   }
 
   if (activeTool === 'path') {
@@ -6651,7 +6609,10 @@ if (clickedEl instanceof Group) {
         anchors: [new Anchor(mx, my, 0, 0)]
     });
     drawingElem.isDrawing = true;
-    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll(); return;
+    elements.push(drawingElem); selectedIds = [id]; isDragging = true; renderAll();
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
+    return;
   }
 
   if (activeTool === 'pen') {
@@ -6675,6 +6636,8 @@ if (clickedEl instanceof Group) {
         isDragging = true;
         dragMode = 'draw';
         renderAll();
+        ensureFrameIsKeyframe(currentFrameIndex);
+        renderTimeline();
         return;
     }
     dragMode = 'draw';
@@ -6706,6 +6669,8 @@ if (clickedEl instanceof Group) {
     };
     input.addEventListener('keydown', e => { if (e.key === 'Enter') commitText(); if (e.key === 'Escape') input.remove(); });
     input.addEventListener('blur', commitText);
+    ensureFrameIsKeyframe(currentFrameIndex);
+    renderTimeline();
     return;
   }
 
@@ -7462,9 +7427,6 @@ if (dragMode === 'rotate') {
    3. Save state (captures final position + NEW pivot)
    4. Render once with final data
    ═══════════════════════════════════════════ */
-/* ===============================================
-   FULL onMouseUp() FUNCTION - REPLACE ENTIRELY
-=============================================== */
 function onMouseUp(e) {
   if (e.button !== 0) return;
 
@@ -7518,7 +7480,7 @@ function onMouseUp(e) {
       continue;
     }
   }
-  
+    
   /* ==================== DRAG MODE RESET ==================== */
   dragMode = null;
   resizeHandle = null;
@@ -7581,20 +7543,6 @@ function onMouseUp(e) {
       renderAll();
       renderTimeline();
       return;
-    }
-    return;
-  }
-  
-  /* ==================== DRAWING TOOL ==================== */
-  if (activeTool === 'draw') {
-    if (tempDrawingShape) {
-      tempDrawingShape.isNewTempElement = false;
-      currentPath = null;
-      drawPointCount = 0;
-      ensureFrameIsKeyframe(currentFrameIndex);
-      saveState();
-      renderAll();
-      renderTimeline();
     }
     return;
   }
@@ -7807,7 +7755,8 @@ document.getElementById('file-open-input').addEventListener('change', (e) => {
             visible: item.visible !== false,
             locked: item.locked || false,
             parent: item.parent || null,
-            closed: item.closed || false
+            closed: item.closed || false,
+            fillRule: item.fillRule || 'nonzero'
           });
           
           // 🔴 RESTORE ANCHORS WITH NEW Anchor INSTANCES
@@ -8104,6 +8053,7 @@ function getSvgString() {
         nodeStr += `stroke="${item.stroke}" stroke-width="${item.strokeW}" `;
         nodeStr += `stroke-opacity="${item.strokeOp}" `;
         nodeStr += `fill="${item.fill}" fill-opacity="${item.fillOp}" `;
+        nodeStr += `fill-rule="${item.fillRule || 'nonzero'}" `;
         nodeStr += `stroke-linecap="round" stroke-linejoin="round"`;
         
         if (item.blend && item.blend !== 'Normal') {
@@ -8317,65 +8267,6 @@ function exportCurrentFrame(format) {
       console.error(err);
       showToast("Export Failed");
     });
-}
-
-function exportRAWR() {
-  // RAWR format compatible with Glaxnimate
-  const rawData = {
-    version: "1.0",
-    meta: {
-      fps: fps,
-      width: docWidth,
-      height: docHeight,
-      frames: totalFrames
-    },
-    layers: [],
-    keyframes: []
-  };
-
-  // Map timelineData to RAWR structure
-  timelineData.forEach((frame, index) => {
-    if (frame.elements && frame.elements.length > 0) {
-      frame.elements.forEach(el => {
-        // Simplified mapping - in production you'd map every property precisely
-        const layer = {
-          id: el.id.toString(),
-          name: el.name,
-          type: el.type === 'path' ? 'bezier' : el.type,
-          transforms: {
-            position: { x: el.x, y: el.y },
-            rotation: el.rot,
-            scale: el.w > 0 ? { x: 1, y: 1 } : { x: 0, y: 0 } // Placeholder
-          },
-          style: {
-            fill: el.fill,
-            stroke: el.stroke,
-            strokeWidth: el.strokeW,
-            opacity: el.fillOp !== undefined ? el.fillOp : 1
-          }
-        };
-
-        if (el.type === 'path' && el.anchors) {
-          layer.points = el.anchors.map(a => ({
-            p: [a.x, a.y],
-            h: [[Math.cos(a.angleOut)*a.handleLengthOut, Math.sin(a.angleOut)*a.handleLengthOut], 
-                [Math.cos(a.angleIn)*a.handleLengthIn, Math.sin(a.angleIn)*a.handleLengthIn]]
-          }));
-        }
-
-        // Add keyframe entry
-        rawData.keyframes.push({
-          layerId: el.id,
-          frame: index,
-          data: layer
-        });
-      });
-    }
-  });
-
-  const jsonStr = JSON.stringify(rawData, null, 2);
-  downloadFile(jsonStr, `project.rawr`, 'application/json');
-  showToast("RAWR (Glaxnimate) Exported");
 }
 
 function escapeXml(unsafe) {
@@ -8676,24 +8567,75 @@ function pruneDeletedElementsFromTimeline(deletedId) {
   });
 }
 
-function doDelete() {
-  if (!selectedIds.length) return;
-  
-  // 1. Remove from UI list immediately
-  const deletedIds = [...selectedIds]; // Copy to iterate safely
-  
-  elements = elements.filter(e => !selectedIds.includes(e.id));
-  selectedIds = [];
-  
-  // 2. CRITICAL FIX: Remove from Timeline History
-  deletedIds.forEach(id => {
-    pruneDeletedElementsFromTimeline(id);
-  });
+function pruneDeletedElementsFromTimeline(deletedId) {
+  // Clean up BOTH the elementFrames Map AND any legacy elements array
+  for (let f = 0; f < timelineData.length; f++) {
+    const frame = timelineData[f];
+    
+    // Remove from elementFrames Map (THIS IS THE IMPORTANT ONE)
+    if (frame.elementFrames && frame.elementFrames.has(deletedId)) {
+      frame.elementFrames.delete(deletedId);
+    }
+    
+    // Remove from frames array if it exists
+    if (frame.frames && frame.frames.length > 0) {
+      frame.frames = frame.frames.filter(frm => frm.elementId !== deletedId);
+    }
+    
+    // Legacy cleanup (for backwards compatibility)
+    if (frame.elements) {
+      frame.elements = frame.elements.filter(el => el.id !== deletedId);
+    }
+  }
+}
 
-  saveState(); 
-  renderAll(); 
-  renderTimeline(); // Re-render timeline to remove tracks
-  showToast('Deleted');
+function getAllDescendantIds(groupId) {
+    const ids = [groupId];
+    const group = elements.find(e => e.id === groupId);
+    
+    if (group instanceof Group && group.children) {
+        group.children.forEach(childId => {
+            const child = elements.find(e => e.id === childId);
+            if (child) {
+                ids.push(...getAllDescendantIds(childId));
+            }
+        });
+    }
+    
+    return ids;
+}
+
+function doDelete() {
+    
+    // Collect ALL descendant IDs (including nested groups and their children)
+    const allIdsToDelete = [];
+    selectedIds.forEach(id => {
+        allIdsToDelete.push(...getAllDescendantIds(id));
+    });
+    
+    // CLEAN TIMELINE FIRST (before touching elements array)
+    allIdsToDelete.forEach(id => {
+        pruneDeletedElementsFromTimeline(id);
+    });
+    
+    // Then remove from elements array
+    elements = elements.filter(e => !allIdsToDelete.includes(e.id));
+    
+    // Clean up parent references in remaining groups
+    elements.forEach(el => {
+        if (el instanceof Group && Array.isArray(el.children)) {
+            el.children = el.children.filter(childId => !allIdsToDelete.includes(childId));
+        }
+    });
+    
+    // Clear selections
+    selectedIds = [];
+    focusedElementId = null;
+    
+    saveState();
+    renderAll();
+    renderTimeline();
+    showToast('Deleted');
 }
 
 function doCopy() {
@@ -9129,39 +9071,18 @@ if (e.key === 'Escape') {
   if (ctrl && e.key === ']') { e.preventDefault(); doReorder(shift ? 'front' : 'up'); return; }
   if (ctrl && e.key === '[') { e.preventDefault(); doReorder(shift ? 'back' : 'down'); return; }
 
-  if (e.key === 'Delete' || e.key === 'Backspace') {
+if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
     
-    // Check if currently editing a group
-    const editingGroup = elements.find(e => e instanceof Group && e.isEditing);
-    if (editingGroup && !hit) {  // <-- Only exit if we hit NOTHING
-      const gBounds = editingGroup.getBounds();
-      const clickedOutside = !(mx >= gBounds.x - 15 && mx <= gBounds.x + gBounds.w + 15 &&
-                               my >= gBounds.y - 15 && my <= gBounds.y + gBounds.h + 15);
-      
-      if (clickedOutside) {  // <-- And only if actually outside bounds
-        editingGroup.isEditing = false;
-        selectedIds = [editingGroup.id];
-        saveState();
-        renderAll();
-        showToast("Exited Group Edit Mode");
-        lastClickTime = 0;
-        lastClickPos = { x: -1000, y: -1000 };
-        return;
-      }
-    }
-    
-    // ✅ CASE 1: Left List Selected → Delete EVERYTHING
+    // CASE 1: Left List Selected → Delete EVERYTHING
     if (isElementListSelected && selectedIds.length > 0) {
         const deletedIds = [...selectedIds];
         
-        // Remove from canvas
         elements = elements.filter(e => !deletedIds.includes(e.id));
         selectedIds = [];
         focusedElementId = null;
         isElementListSelected = false;
         
-        // REMOVE FROM ALL FRAMES IN TIMELINE
         for (let i = 0; i < totalFrames; i++) {
             timelineData[i].elementFrames.delete(deletedIds[0]);
             timelineData[i].frames = timelineData[i].frames.filter(
@@ -9176,15 +9097,15 @@ if (e.key === 'Escape') {
         return;
     }
     
-    // ✅ CASE 2: Otherwise (timeline/canvas) → Delete current frame only
+    // CASE 2: Timeline focused → Delete keyframe only
     if (isTimelineFocused) {
         removeKeyframeAtCurrentFrame();
         return;
     }
     
-    // Fallback
+    // Fallback → Delete selected element(s)
     doDelete();
-  }
+}
   
   if (e.key === 'Escape') {
     selectedIds = [];
@@ -9288,10 +9209,6 @@ document.getElementById('btn-elem-add').addEventListener('click', () => {
   }));
   selectedIds = [id];
   saveState(); renderAll();
-});
-
-document.getElementById('btn-folder-add').addEventListener('click', () => {
-  showToast('Folder — coming soon');
 });
 
 document.getElementById('btn-elem-del').addEventListener('click', () => {
