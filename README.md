@@ -19,12 +19,12 @@ Features:
 - Onion Skin
 - Animation
 - Export to WebM, SVG+Smil, SVG+CSS
+- Group
+- Lock
 
 TODO:
-- Group
 - Scale Test (repeat the animation of a scale, Jaiden did one with smilies and frownies)
 - Bell Test (repeat the animation done in Friction of a Bell)
-- Lock
 - Boolean actions (Union, Subtract, Intersect, Division)
 - Line-rail (Ctrl) [Not worth it, we got Pen for that]
 - Path-rail (Ctrl) [Not worth it, we got Path for that]
