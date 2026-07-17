@@ -7,6 +7,8 @@
       - Reverted onmouseup (pen and path were broken)
       - Removed dead code (DRAWING TOOL on mouseup)
       
+    The Shapes are created with and height 0 but are not resized on mouseup, please fix.
+      
     Make minimal changes to avoid altering other functionalities and tell me what parts to update and add comments so future editors know exactly WHY things exist and WHAT they do.
 -->
 <!DOCTYPE html>
@@ -1063,6 +1065,10 @@ updateDraw(mx, my) {
        this.y = Math.min(this.y, this.y2);
        this.w = Math.abs(this.x2 - this.x);
        this.h = Math.abs(this.y2 - this.y);
+       
+       // 🔴 ADD: Minimum size enforcement for lines too
+       if (this.w < 1) { this.w = 1; this.x2 = this.x + 1; }
+       if (this.h < 1) { this.h = 1; this.y2 = this.y + 1; }
      } else {
        let w = Math.abs(mx - this.x);
        let h = Math.abs(my - this.y);
@@ -1073,6 +1079,10 @@ updateDraw(mx, my) {
        this.w = w; this.h = h;
        if (mx < this.x) this.x = mx;
        if (my < this.y) this.y = my;
+       
+       // 🔴 ADD: Minimum size enforcement for regular shapes
+       if (this.w < 1) { this.w = 1; this.x -= 1; }
+       if (this.h < 1) { this.h = 1; this.y -= 1; }
      }
      
      // ADD THIS: Keep pivot centered as the shape grows
@@ -7438,7 +7448,39 @@ function onMouseUp(e) {
     isDragging = false;
     return;
   }
-  
+    /* ==================== CRITICAL SHAPE FINALIZATION FIX ==================== */
+  /* WHY: Shapes created with width/height 0 weren't being properly 
+          committed when mouse was released. The updateDraw() runs during
+          onMouseMove, but the timeline state wasn't saved until later.
+          
+          WHAT: Force final pivot update and keyframe commit BEFORE resetting 
+                drag state, ensuring the shape's actual dimensions are recorded.
+  */
+  if (dragMode === 'draw' && drawingElem && drawingElem instanceof Shape) {
+      // 🔴 FORCE UPDATE PIVOT AFTER FINAL DRAW
+      drawingElem._updatePivot();
+      
+      // 🔴 ENSURE MINIMUM SIZE (prevent 0-dimension shapes)
+      if (drawingElem.w < 1) {
+          const defSize = 50;
+          const centerX = drawingElem.x + drawingElem.w / 2;
+          const centerY = drawingElem.y + drawingElem.h / 2;
+          drawingElem.x = centerX - defSize / 2;
+          drawingElem.y = centerY - defSize / 2;
+          drawingElem.w = defSize;
+          drawingElem.h = defSize;
+      }
+      
+      // 🔴 COMMIT KEYFRAME WITH FINAL STATE (was happening too late before)
+      ensureFrameIsKeyframe(currentFrameIndex);
+      
+      // 🔴 SAVE TO UNDO STACK (so we can revert the drawing action)
+      saveState();
+      
+      // 🔴 Clear drawing reference AFTER committing state
+      drawingElem = null;
+  }
+      
   // ✅ Get coordinates locally
   const pos = getArtboardCoords(e.clientX, e.clientY);
   const mx = pos.x;
