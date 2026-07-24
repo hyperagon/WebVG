@@ -1,5 +1,7 @@
 <!--
     The Frame generated after closing the shape with the pen tool is missing the last connection, what's going on? (// save frame AFTER closing path)
+    
+    Human Intervention: Removed the close if cursor is close to the start node as it is pointless.
       
     Make minimal changes to avoid altering other functionalities and tell me what parts to update and add comments so future editors know exactly WHY things exist and WHAT they do.
 -->
@@ -6982,31 +6984,6 @@ if (clickedEl instanceof Group) {
 
   if (activeTool === 'pen') {
     if (drawingElem && drawingElem.isDrawing) {
-        if (drawingElem.anchors.length > 2) {
-            const start = drawingElem.anchors[0];
-            const dist = Math.hypot(mx - start.x, my - start.y);
-            if (dist < 15) {
-                drawingElem.closed = true;
-                drawingElem._updatePivot();
-                drawingElem.isDrawing = false;
-
-                // --- FIX: sync the timeline keyframe with the now-closed path ---
-                // Must call ensureFrameIsKeyframe BEFORE nulling drawingElem and
-                // clearing selectedIds. The keyframe was last written when the
-                // final anchor was added (with closed=false). Without this update,
-                // applyFrameFromData reconstructs the element from the stale
-                // keyframe (closed=false) and the closing segment is never drawn.
-                ensureFrameIsKeyframe(currentFrameIndex);
-
-                drawingElem = null;
-                selectedIds = [];
-                saveState();
-                renderAll();
-                renderTimeline();   // refresh timeline to show updated keyframe
-                showToast("Path Closed");
-                return;
-            }
-        }
         drawingElem.addAnchor(mx, my);
         isDragging = true;
         dragMode = 'draw';
