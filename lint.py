@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# html_lint.py
+# make an HTML linter and make sure that it checks inline CSS and JS, don't fuck it up, < can be alone inside CSS or JS in Python
 import re
 import sys
 from html.parser import HTMLParser
