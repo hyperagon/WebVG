@@ -24,8 +24,8 @@ Features:
 
 Test:
 
-- [Mockup11](https://github.com/hyperagon/WebVG/blob/main/4/mockup11.html)
-- [Mockup10](https://github.com/hyperagon/WebVG/blob/main/3/mockup10.html)
+- [Mockup11](https://github.com/hyperagon/WebVG/blob/main/4/mockup11.html) (Editing+Animation)
+- [Mockup10](https://github.com/hyperagon/WebVG/blob/main/3/mockup10.html) (Editing)
 - [Any other mockup](https://github.com/hyperagon/WebVG/blob/main/3/)
 
 TODO:
