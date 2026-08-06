@@ -1,0 +1,1362 @@
+<!--
+    Turn this mock-up into a fully fledged vector editing and animation application.
+    Everything should be in a single HTML file as shown here so don't even think of using frameworks like Tailwind or Typescript and spliting it into many files,
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebVG -4.11</title>
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root { --bg-dark: #1e1e1e; --bg-panel: #252526; --bg-hover: #2a2d2e; --bg-active: #37373d; --border: #3c3c3c; --text-dim: #5a5a5a; --text-muted: #9e9e9e; --text-bright: #cccccc; --accent: #e8a634; --accent-hover: #f0b84e; --accent-dim: rgba(232,166,52,0.12); --menu-bg: #2d2d30; --menu-hover: #094771; --scroller: #424242; --scroller-hover: #4f4f4f; }
+html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg-dark); color: var(--text-muted); font-size: 12px; }
+::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--scroller); border-radius: 3px; } ::-webkit-scrollbar-thumb:hover { background: var(--scroller-hover); }
+#app { display: grid; grid-template-rows: 30px 1fr 120px; grid-template-columns: 24px 1fr 24px; grid-template-areas: "top top top" "left center right" "left bottom right"; height: 100vh; width: 100vw; }
+#app > section { border: 1px solid var(--border); background: var(--bg-panel); position: relative; }
+#TOP { grid-area: top; border-top: none; border-left: none; border-right: none; background: var(--bg-panel); display: flex; align-items: stretch; padding: 0; z-index: 1000; }
+.menu-item { position: relative; padding: 0 10px; display: flex; align-items: center; cursor: default; user-select: none; font-size: 12px; color: var(--text-muted); transition: background 0.08s; }
+.menu-item:hover, .menu-item.open { background: var(--menu-hover); color: var(--text-bright); }
+.mi-icon { width: 15px; height: 15px; margin-right: 4px; flex-shrink: 0; }
+.mi-icon svg { width: 100%; height: 100%; display: block; }
+.dropdown { position: absolute; top: 100%; left: 0; min-width: 260px; background: var(--menu-bg); border: 1px solid #454545; box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0; display: none; z-index: 2000; }
+.dropdown.show { display: block; }
+.dd-item { display: flex; align-items: center; justify-content: space-between; padding: 5px 24px 5px 12px; cursor: default; position: relative; color: var(--text-muted); white-space: nowrap; transition: background 0.08s, color 0.08s; }
+.dd-item:hover { background: var(--menu-hover); color: var(--text-bright); }
+.dd-item.disabled { color: var(--text-dim); pointer-events: none; }
+.dd-icon { width: 16px; height: 16px; margin-right: 8px; opacity: 0.7; flex-shrink: 0; }
+.dd-icon svg { width: 100%; height: 100%; display: block; }
+.dd-item .label { flex: 1; }
+.dd-item .shortcut { margin-left: 28px; font-size: 11px; color: var(--text-dim); }
+.dd-item:hover .shortcut { color: var(--text-muted); }
+.dd-sep { height: 1px; background: var(--border); margin: 4px 8px; }
+.dd-item .arrow { font-size: 10px; margin-left: 12px; opacity: 0.5; }
+.submenu { position: absolute; left: 100%; top: -4px; min-width: 220px; background: var(--menu-bg); border: 1px solid #454545; box-shadow: 0 8px 30px rgba(0,0,0,0.5); padding: 4px 0; display: none; z-index: 2001; }
+.dd-item:hover > .submenu { display: block; }
+#LEFT { grid-area: left; border-top: none; border-left: none; display: flex; flex-direction: column; align-items: center; padding: 4px 0; gap: 1px; overflow-y: auto; overflow-x: hidden; }
+.tool-btn { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 3px; position: relative; color: var(--text-dim); transition: all 0.12s; flex-shrink: 0; }
+.tool-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+.tool-btn.active { background: var(--accent-dim); color: var(--accent); }
+.tool-btn svg { width: 16px; height: 16px; display: block; }
+.tool-sep { width: 16px; height: 1px; background: var(--border); margin: 3px 0; flex-shrink: 0; }
+.tool-btn::after { content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); background: #1f1f1f; color: var(--text-bright); padding: 4px 10px; border-radius: 4px; font-size: 11px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 500; border: 1px solid #454545; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.tool-btn:hover::after { opacity: 1; }
+#RIGHT { grid-area: right; border-top: none; border-right: none; display: flex; flex-direction: column; align-items: center; padding: 4px 0; gap: 2px; cursor: default; }
+.prop-btn { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 3px; color: var(--text-dim); transition: all 0.12s; cursor: pointer; flex-shrink: 0; }
+.prop-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+.prop-btn.active { background: var(--accent-dim); color: var(--accent); }
+.prop-btn svg { width: 16px; height: 16px; display: block; }
+#right-flyout { position: fixed; right: 24px; top: 30px; bottom: 0; width: 280px; background: var(--bg-panel); border-left: 1px solid var(--border); box-shadow: -4px 0 24px rgba(0,0,0,0.3); z-index: 900; display: none; flex-direction: column; overflow: hidden; }
+#right-flyout.show { display: flex; }
+.flyout-header { padding: 8px 12px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.flyout-body { flex: 1; overflow-y: auto; padding: 0; }
+.section { border-bottom: 1px solid var(--border); }
+.section-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; cursor: pointer; user-select: none; transition: background 0.1s; }
+.section-head:hover { background: var(--bg-hover); }
+.section-head .title { font-size: 11px; font-weight: 600; color: var(--text-bright); letter-spacing: 0.3px; }
+.section-head .chevron { width: 16px; height: 16px; color: var(--text-dim); transition: transform 0.2s; }
+.section-head .chevron svg { width: 100%; height: 100%; display: block; }
+.section.collapsed .section-head .chevron { transform: rotate(-90deg); }
+.section-body { padding: 6px 12px 10px; display: grid; gap: 6px; }
+.section.collapsed .section-body { display: none; }
+.field { display: flex; align-items: center; gap: 6px; }
+.field label { font-size: 10px; color: var(--text-dim); width: 16px; text-align: right; flex-shrink: 0; }
+.field input[type="number"] { flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright); padding: 3px 6px; border-radius: 3px; font-size: 11px; width: 0; outline: none; font-family: inherit; transition: border-color 0.15s; }
+.field input[type="number"]:focus { border-color: var(--accent); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6<px; }
+.color-row { display: flex; gap: 10px; align-items: center; }
+.color-swatch { width: 24px; height: 24px; border-radius: 4px; border: 2px solid var(--border); cursor: pointer; position: relative; overflow: hidden; flex-shrink: 0; }
+.color-swatch input[type="color"] { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); cursor: pointer; border: none; padding: 0; }
+.color-label { font-size: 11px; color: var(--text-muted); }
+select.field-ctrl { flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright); padding: 3px 6px; border-radius: 3px; font-size: 11px; outline: none; font-family: inherit; cursor: pointer; }
+select.field-ctrl:focus { border-color: var(--accent); }
+input[type="range"].field-ctrl { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
+.range-val { font-size: 10px; color: var(--text-dim); width: 28px; text-align: right; }
+.layers-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.layers-header .title { font-size: 11px; font-weight: 600; color: var(--text-bright); }
+.layers-header .actions { display: flex; gap: 2px; }
+.layers-header .actions button { background: none; border: none; color: var(--text-dim); cursor: pointer; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.1s; }
+.layers-header .actions button:hover { background: var(--bg-hover); color: var(--text-bright); }
+.layers-header .actions button svg { width: 14px; height: 14px; display: block; }
+.elem-list { flex: 1; overflow-y: auto; padding: 2px 0; }
+.elem-item { display: flex; align-items: center; gap: 6px; padding: 4px 12px; cursor: default; transition: background 0.08s; user-select: none; }
+.elem-item .elem-vis, .elem-item .elem-lock { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); cursor: pointer; border-radius: 2px; transition: color 0.1s; }
+.elem-item .elem-vis svg, .elem-item .elem-lock svg { width: 14px; height: 14px; display: block; }
+.elem-item .elem-vis:hover, .elem-item .elem-lock:hover { color: var(--text-bright); }
+.elem-item .elem-vis.off { opacity: 0.3; }
+.elem-item .elem-lock.locked { color: var(--accent); }
+.elem-item .elem-color { width: 10px; height: 10px; border-radius: <2px; flex-shrink: 0; }
+.elem-item .elem-name { flex: 1; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.elem-item.selected .elem-name { color: var(--text-bright); background: var(--accent-dim); }
+#CENTER {
+  grid-area: center;
+  border-top: none;
+  background: var(--bg-dark);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  justify-content: flex-start; /* 👈 CHANGED FROM center to flex-start */
+  align-items: flex-start;     /* 👈 CHANGED FROM center to flex-start */
+  width: 100%;
+  height: 100%;
+}
+#BOTTOM { grid-area: bottom; background: var(--bg-dark); border-top: 1px solid var(--border); display: flex; justify-content: center; align-items: center; padding: 0; overflow: hidden; height: 100%; }
+#timeline-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.timeline-controls {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 10px;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  flex-shrink: 0;
+  z-index: 101;
+}
+
+.timeline-tracks-container {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  background: var(--bg-dark);
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  display: block;
+  padding-top: 1px;
+  margin-right: 6px;
+  min-height: 0;
+}
+
+.timeline-track-row { height: 24px; display: flex; width: 100%; border-bottom: 1px solid rgba(60,60,60,0.5); position: relative; box-sizing: border-box; }
+.track-cells { display: flex; flex-grow: 1; min-width: 0; width: 100%; }
+.track-label { width: 120px; flex-shrink: 0; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; align-items: center; padding-left: 8px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 5; user-select: none; }
+.track-label.active { color: var(--text-bright); background: var(--accent-dim); border-left: 3px solid var(--accent); }
+.track-frame-cell { width: 20px; height: 100%; border-right: 1px solid rgba(60,60,60,0.3); background: transparent; position: relative; flex-shrink: 0; cursor: pointer; transition: background 0.1s; }
+.track-frame-cell:hover { background: var(--bg-hover); }
+.track-frame-cell.active { background: var(--accent-dim); border-color: var(--accent); }
+.track-frame-cell.keyframe { background: rgba(232, 166, 52, 0.2); }
+.track-frame-cell.active.keyframe { background: var(--accent-dim); }
+.frame-indicator-small { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+.track-frame-cell.keyframe .frame-indicator-small { display: block; }
+.scrubber-line-vertical { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; z-index: 10; left: 0; transition: left 0.1s linear; }
+.scrubber-head-small { position: absolute; top: -12px; left: -7px; width: 16px; height: 16px; background: var(--accent); border: 2px solid var(--bg-panel); border-radius: 50%; pointer-events: none; }
+.onion-skin-layer { position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: 0.3; mix-blend-mode: multiply; }
+.artboard { 
+  position: relative; 
+  top: auto; 
+  left: auto; 
+  transform: none; /* Clear any inline transforms that might conflict initially */
+  width: 640px; 
+  height: 480px; 
+  background: #ffffff; 
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 4px 40px rgba(0,0,0,0.4); 
+  overflow: visible; 
+  
+  /* 🔴 CRITICAL: Force scaling from Top-Left */
+  transform-origin: 0% 0%; applyViewTransform
+  
+  /* Ensure no other transform origin interferes */
+  transform-style: flat; 
+}
+#main-svg { display: block; width: 100%; height: 100%; overflow: visible; position: relative; z-index: 1; }
+.artboard.tool-select { cursor: default; }
+.artboard.tool-move { cursor: move; }
+.artboard.tool-rotate { cursor: grab; }
+.artboard.tool-scale { cursor: nwse-resize; }
+.artboard.tool-skew { cursor: crosshair; }
+.artboard.tool-rect, .artboard.tool-ellipse, .artboard.tool-polygon { cursor: crosshair; }
+.artboard.tool-line, .artboard.tool-freehand, .artboard.tool-pen { cursor: crosshair; }
+.artboard.tool-text { cursor: text; }
+.artboard.tool-group, .artboard.tool-ungroup, .artboard.tool-lock, .artboard.tool-unlock { cursor: default; }
+.artboard.tool-bool-union, .artboard.tool-bool-subtract, .artboard.tool-bool-intersect, .artboard.tool-bool-exclude { cursor: default; }
+.sel-box { position: absolute; border: 1.5px solid var(--accent); pointer-events: none; }
+.sel-handle {
+    position: absolute; width: 8px; height: 8px; background: #fff;
+    border: 1.5px solid var(--accent);
+    /* WHY: scale(var(--inv-scale, 1)) undoes the overlay zoom so every handle
+       stays a fixed pixel size. Fallback '1' keeps it correct when the
+       variable hasn't been set yet (initial load). */
+    transform: translate(-50%, -50%) scale(var(--inv-scale, 1));.sel-handle.anchor-point:hover { transform: translate(-50%, -50%) scale(1.2); border-width: 3px; }
+    pointer-events: auto; cursor: pointer;
+}
+.sel-handle.nw { cursor: nw-resize; } .sel-handle.ne { cursor: ne-resize; }
+.sel-handle.sw { cursor: sw-resize; } .sel-handle.se { cursor: se-resize; }
+.sel-handle.n { cursor: n-resize; } .sel-handle.s { cursor: s-resize; }
+.sel-handle.w { cursor: w-resize; } .sel-handle.e { cursor: e-resize; }
+.sel-handle.anchor-point {
+    width: 12px; height: 12px; background: #fff; border: 2px solid var(--accent);
+    /* WHY: Same counter-scale as base .sel-handle; this rule explicitly sets
+       transform so it must include the scale or the 12px dot grows with zoom. */
+    transform: translate(-50%, -50%) scale(var(--inv-scale, 1));
+    cursor: move; z-index: 10; transition: transform 0.1s;
+}
+.sel-handle.anchor-point:hover {
+    /* WHY: Multiply inv-scale by 1.2 so the hover-enlarge still respects
+       the fixed-size constraint — the dot grows 20% but stays zoom-independent. */
+    transform: translate(-50%, -50%) scale(calc(var(--inv-scale, 1) * 1.2));
+    border-width: 3px;
+}
+.sel-handle.anchor-line {
+    position: absolute;
+    /* WHY: The line's WIDTH is set in JS in document units and should scale
+       with zoom (it represents a real distance). But the HEIGHT (thickness)
+       must stay a constant 2px visually, so we multiply by inv-scale:
+       visual thickness = (2px * inv-scale) * viewScale = 2px. */
+    height: calc(2px * var(--inv-scale, 1));
+    background: var(--accent);
+    transform-origin: 0 50%;
+    transition: background 0.2s, height 0.2s;
+    z-index: 1;
+}
+.anchor-group:hover .sel-handle.anchor-line,
+.anchor-group:hover .sel-handle.anchor-line-in,
+.anchor-group:hover .sel-handle.anchor-line-out {
+    /* WHY: Same pattern — 3px visual thickness at any zoom level. */
+    height: calc(3px * var(--inv-scale, 1));
+    background: var(--accent-hover);
+    pointer-events: auto;
+}
+.sel-handle.anchor-circle {
+    position: absolute; width: 12px; height: 12px; background: #fff;
+    border: 2px solid var(--accent); border-radius: 50%;
+    /* WHY: Counter-scale keeps the bezier control-point circles at a fixed
+       12px visual size regardless of the overlay zoom factor. */
+    transform: translate(-50%, -50%) scale(var(--inv-scale, 1));
+    cursor: grab; z-index: 11; transition: border-width 0.2s, transform 0.2s;
+}
+.sel-handle.anchor-circle:hover {
+    border-width: 5px;
+    /* WHY: Same calc pattern as anchor-point:hover — enlarges by 20%
+       while keeping the counter-scale in the product. */
+    transform: translate(-50%, -50%) scale(calc(var(--inv-scale, 1) * 1.2));
+}
+.sel-handle.anchor-circle-in { border-color: var(--accent); background: linear-gradient(90deg, var(--accent) 50%, #fff 50%); border-radius: 50%; }
+.sel-handle.anchor-circle-out { border-color: var(--accent); background: linear-gradient(90deg, #fff 50%, var(--accent) 50%); border-radius: 50%; }
+.sel-handle.anchor-circle-out::after { content: 'I'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #fff; font-weight: bold; pointer-events: none; background: transparent; z-index: 2; }
+.sel-handle.anchor-circle-in::after { content: 'I'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #fff; font-weight: bold; pointer-events: none; background: transparent; z-index: 2; }
+.sel-handle.control { border-radius: 50%; z-index: 20; }
+.sel-rotate-line { position: absolute; left: 50%; top: 0; width: 1px; height: 20px; background: var(--accent); transform: translateX(-50%) translateY(-20px); pointer-events: none; }
+.sel-rotate-handle {
+    position: absolute; left: 50%; top: 0; width: 10px; height: 10px;
+    background: #fff; border: 1.5px solid var(--accent); border-radius: 50%;
+    /* WHY: translateY(-20px) stays in document space (it should scale with
+       zoom so the handle moves further away at higher magnification —
+       matching the .sel-rotate-line which also scales).
+       scale(var(--inv-scale, 1)) counteracts the overlay zoom so the handle
+       itself stays a fixed 10px visual size. */
+    transform: translate(-50%, -50%) translateY(-20px) scale(var(--inv-scale, 1));
+    cursor: grab; pointer-events: auto;
+}
+.sel-pivot { 
+    position: absolute; 
+    width: 10px; 
+    height: 10px; 
+    pointer-events: auto; 
+    cursor: crosshair; 
+    z-index: 10; 
+    transform: translate(-50%, -50%) rotate(45deg) scale(var(--inv-scale, 1));
+}
+.sel-pivot-inner { position: absolute; inset: 0; border: 1.5px solid var(--accent); background: rgba(255,255,255,0.85); }
+#canvas-grid { position: absolute; inset: 0; pointer-events: none; opacity: 0.3; background-image: radial-gradient(circle, #444 0.8px, transparent 0.8px); background-size: 20px 20px; }
+#menu-overlay { position: fixed; inset: 0; z-index: 999; display: none; }
+#menu-overlay.show { display: block; }
+/* Update #selection-overlay CSS */
+#selection-overlay { 
+  position: absolute; 
+  top: 0; 
+  left: 0; 
+  pointer-events: none; 
+  overflow: visible; 
+  z-index: 10; 
+  
+  /* 🔴 CRITICAL: Must match Artboard exactly */
+  transform-origin: 0% 0%; 
+  
+  /* Ensure it has explicit dimensions matching the document, not the screen */
+  width: 640px;
+  height: 480px;
+}
+*:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.text-input-overlay { position: absolute; background: transparent; border: 1px dashed var(--accent); color: #000; font-size: 16px; font-family: inherit; padding: 2px 4px; outline: none; z-index: 100; min-width: 60px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: none; align-items: center; justify-content: center; z-index: 10000; }
+.modal-overlay.show { display: flex; }
+.modal-content { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6); width: 400px; max-width: 90vw; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.modal-title { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+.modal-close { background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; padding: 0 4px; }
+.modal-close:hover { color: var(--text-bright); }
+.modal-body { padding: 16px; }
+.pref-section { margin-bottom: 16px; }
+.pref-label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 8px; }
+.pref-row { display: flex; gap: 12px; }
+.pref-field { flex: 1; }
+.pref-field label { display: block; font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+.pref-field input[type="number"] { width: 100%; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright); padding: 6px 8px; border-radius: 4px; font-size: 12px; outline: none; }
+.pref-field input[type="number"]:focus { border-color: var(--accent); }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.btn-secondary, .btn-primary { padding: 6px 16px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid var(--border); }
+.btn-secondary { background: var(--bg-dark); color: var(--text-muted); }
+.btn-secondary:hover { background: var(--bg-hover); color: var(--text-bright); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); }
+.t-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 3px; color: var(--text-muted); cursor: pointer; transition: all 0.1s; }
+.t-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+.t-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+.t-label { color: var(--text-dim); font-size: 10px; }
+.t-input { width: 50px; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-bright); padding: 2px 4px; border-radius: 3px; font-size: 10px; text-align: center; }
+.t-input:focus { border-color: var(--accent); outline: none; }
+.t-slider { flex: 1; accent-color: var(--accent); height: 4px; cursor: pointer; }
+.t-range-group { display: flex; align-items: center; gap: 6px; margin-left: 10px; }
+
+#progress-modal .modal-content {
+  position: relative;
+  z-index: 10001;  /* Above other overlays */
+}
+
+.modal-close:hover {
+  color: #ff6b6b;  /* Red on hover to indicate cancel */
+}
+
+/* Smooth progress animation */
+#progress-fill {
+  box-shadow: 0 0 8px rgba(232, 166, 52, 0.5);
+}
+
+/* Loading spinner alternative */
+@keyframes progress-pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+.progress-loading {
+  animation: progress-pulse 1.5s infinite;
+}
+
+/* ===================================================================
+   GROUP EDIT MODE VISUALIZATION
+   Why: User requirement states "On Editing a Group its bounding box 
+        appears as a dashed box" - provides clear feedback that group 
+        edit mode is active
+=================================================================== */
+
+.group-edit-indicator {
+  position: absolute;
+  border: 2px dashed #e8a634 !important;
+  background: rgba(232, 166, 52, 0.05);
+  pointer-events: none !important;
+  z-index: 100;
+  transition: all 0.1s ease-out;
+}
+
+.group-edit-indicator:hover {
+  background: rgba(232, 166, 52, 0.1);
+}
+
+/* Highlight editable elements when group is in edit mode */
+.group-edit-child-highlight {
+  outline: 1px solid rgba(232, 166, 52, 0.4);
+  border-radius: 2px;
+}
+
+.group-edit-border {
+  position: absolute !important;
+  border: 2px dashed #e8a634 !important;
+  background: rgba(232, 166, 52, 0.05) !important;
+  pointer-events: none !important;
+  z-index: 99;
+  box-sizing: border-box !important;
+}
+
+.elem-item.dragging {
+    opacity: 0.5;
+    background: var(--accent-dim);
+}
+
+.elem-item.drop-target {
+    border-left: 3px solid var(--accent);
+    background: var(--bg-hover);
+}
+
+/* Indentation for dropped items */
+.elem-item.with-indent {
+    padding-left: calc(12px + var(--indent-depth) * 14px) !important;
+}
+
+/* Drag position indicators */
+.elem-item.drop-above {
+    border-top: 3px solid var(--accent);
+    background: var(--bg-hover);
+}
+
+.elem-item.drop-below {
+    border-bottom: 3px solid var(--accent);
+    background: var(--bg-hover);
+}
+
+.elem-item.dragging {
+    opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none animation: none; } }
+</style>>
+</head>
+<body>
+
+
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden">
+<defs>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path><line x1="1" y1="1" x2="23" y2="23"></line></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></symbol>
+  <symbol id="i-new" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></symbol>
+  <symbol id="i-saveas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4z"></path><path d="M15 3v4h4"></path><path d="M8 13h8"></path><path d="M8 17h5"></path></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></symbol>
+  <symbol id="i-font" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"></path><path d="M9.354 4H14.646L20 20H4L9.354 4z"></path><line x1="8" y1="20" x2="16" y2="20"></line></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></symbol>
+  <symbol id="i-crop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></symbol>
+  <symbol id="i-anim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 12 17 22 12 12 17 2"></polygon><polyline points="7 22 2 12 7 2"></polyline><polyline points="12 22 7 12 12 2"></polyline></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></symbol>
+  <symbol id="i-cut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></symbol>
+  <symbol id="i-selectall" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><polyline points="3 9 3 3 9 3"></polyline><polyline points="15 3 21 3 21 9"></polyline><polyline points="21 15 21 21 15 21"></polyline><polyline points="9 21 3 21 3 15"></polyline></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></symbol>
+  <symbol id="i-zoomin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></symbol>
+  <symbol id="i-zoomout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0z"></path><line x1="14.5" y1="5.5" x2="18.5" y2="9.5"></line><line x1="12" y1="2" x2="12" y2="5"></line><line x1="4" y1="12" x2="7" y2="12"></line></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></symbol>
+  <symbol id="i-snap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><circle cx="6.5" cy="6.5" r="1" fill="currentColor"></circle><circle cx="17.5" cy="6.5" r="1" fill="currentColor"></circle><circle cx="17.5" cy="17.5" r="1" fill="currentColor"></circle><circle cx="6.5" cy="17.5" r="1" fill="currentColor"></circle></symbol>
+  <symbol id="i-snapobj" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M6.5 3v-1M6.5 8v1M3 6.5H2M8 6.5H9M17.5 3v-1M17.5 8v1M14 6.5h-1M19 6.5h1M17.5 14v-1M17.5 19v1M14 17.5h-1M19 17.5h1M6.5 14v-1M6.5 19v1M3 17.5H2M8 17.5H9"></path></symbol>
+  <symbol id="i-snapanc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M6.5 3v-1M6.5 8v1M3 6.5H2M8 6.5H9M17.5 3v-1M17.5 8v1M14 6.5h-1M19 6.5h1M17.5 14v-1M17.5 19v1M14 17.5h-1M19 17.5h1M6.5 14v-1M6.5 19v1M3 17.5H2M8 17.5H9"></path></symbol>
+  <symbol id="i-guides" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><circle cx="12" cy="12" r="3"></circle></symbol>
+  <symbol id="i-front" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="14" height="14" rx="2" fill="currentColor"></rect><rect x="2" y="8" width="14" height="14" rx="2"></rect></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="14" height="14" rx="2" fill="currentColor"></rect><rect x="8" y="2" width="14" height="14" rx="2" fill="var(--menu-bg)"></rect></symbol>
+  <symbol id="i-arrowup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><polyline points="5 12 12 5 19 12"></polyline></symbol>
+  <symbol id="i-arrowdown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><polyline points="19 12 12 19 5 12"></polyline></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" fill="currentColor"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></symbol>
+  <symbol id="i-lockopen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 7 0 0 1 9.9-1"></path></symbol>
+  <symbol id="i-union" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="7"></circle><circle cx="15" cy="12" r="7"></circle></symbol>
+  <symbol id="i-subtract" viewBox="0 0 24 24" fill="none"><path d="M12 5.68A7 7 0 1 0 12 18.32A7 7 0 0 1 12 5.68Z" fill="currentColor"></path><circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"></circle></symbol>
+  <symbol id="i-intersect" viewBox="0 0 24 24"><path d="M12 5.675 A7 7 0 0 0 12 18.325 A7 7 0 0 0 12 5.675 Z" fill="currentColor" stroke="currentColor"></path><circle cx="9" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2" fill="none"></circle><circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2" fill="none"></circle></symbol>
+  <symbol id="i-exclude" viewBox="0 0 24 24"><path d="M12 5.6754A7 7 0 1 0 12 18.3246A7 7 0 0 1 12 5.6754Z" fill="currentColor"></path><path d="M12 5.6754A7 7 0 1 1 12 18.3246A7 7 0 0 0 12 5.6754Z" fill="currentColor"></path><circle cx="9" cy="12" r="7" stroke="currentColor" stroke-width="1.5" fill="none"></circle><circle cx="15" cy="12" r="7" stroke="currentColor" stroke-width="1.5" fill="none"></circle></symbol>
+  <symbol id="i-group" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"></circle><circle cx="8" cy="10" r="2.5" fill="var(--bg-panel)"></circle><circle cx="16" cy="14" r="2.5" fill="var(--bg-panel)"></circle></symbol>
+  <symbol id="i-ungroup" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"></circle><circle cx="8" cy="10" r="2.5" fill="currentColor"></circle><circle cx="16" cy="14" r="2.5" fill="currentColor"></circle></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"></path></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></symbol>
+  <symbol id="i-cursor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-6 1-3 6z"></path></symbol>
+  <symbol id="i-rect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></symbol>
+  <symbol id="i-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></symbol>
+  <symbol id="i-polyton" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 21.5 9 18 21 6 21 2.5 9"></polygon></symbol>
+  <symbol id="i-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"></line></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M0 12c4-12 8-12 12 0s8 12 12 0"></path></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7H12v-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></symbol>
+<symbol id="i-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4L4 20"></path><path d="M12 4l8 16"></path><path d="M7.5 14h9"></path></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></symbol>
+  <symbol id="i-geometry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="3" x2="9" y2="21"></line></symbol>
+  <symbol id="i-droplet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></symbol>
+  <symbol id="i-folderplus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"></rect></symbol>
+</defs>
+</svg>
+
+<div id="menu-overlay"></div>
+
+<div id="prefs-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span class="modal-title">Preferences</span>
+      <button class="modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="pref-section">
+        <label class="pref-label">Document Size</label>
+        <div class="pref-row">
+          <div class="pref-field">
+            <label for="pref-width">Width</label>
+            <input type="number" id="pref-width" value="640" min="1">
+          </div>
+          <div class="pref-field">
+            <label for="pref-height">Height</label>
+            <input type="number" id="pref-height" value="480" min="1">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-prefs-cancel" class="btn-secondary">Cancel</button>
+      <button id="btn-prefs-ok" class="btn-primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <!-- TOP BAR -->
+  <section id="TOP" role="menubar" aria-label="Main menu">
+    <div class="menu-item" data-menu="file" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-file"></use></svg></span>File
+      <div class="dropdown" id="menu-file" role="menu">
+        <div class="dd-item" data-action="new"><span class="dd-icon"><svg><use href="#i-new"></use></svg></span><span class="label">New Document</span><span class="shortcut">Ctrl+Shift+N</span></div>
+        <div class="dd-item" data-action="open"><span class="dd-icon"><svg><use href="#i-folder"></use></svg></span><span class="label">Open</span><span class="shortcut">Ctrl+Shift+O</span></div>
+        <div class="dd-item" data-action="save"><span class="dd-icon"><svg><use href="#i-save"></use></svg></span><span class="label">Save</span><span class="shortcut">Ctrl+Shift+S</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="import">
+          <span class="dd-icon"><svg><use href="#i-download"></use></svg></span><span class="label">Import</span><span class="arrow">▸</span>
+          <div class="submenu" role="menu">
+<div class="dd-item" data-action="import-svg"><span class="dd-icon"><svg><use href="#i-code"></use></svg></span><span class="label">SVG File</span></div>
+            <div class="dd-item" data-action="import-img"><span class="dd-icon"><svg><use href="#i-image"></use></svg></span><span class="label">Raster Image</span></div>
+          </div>
+        </div>
+        <div class="dd-item" data-action="export">
+          <span class="dd-icon"><svg><use href="#i-upload"></use></svg></span><span class="label">Export</span><span class="arrow">▸</span>
+          <div class="submenu" role="menu">
+            <div class="dd-item" data-action="export-frame">
+              <span class="dd-icon"><svg><use href="#i-crop"></use></svg></span><span class="label">Single Frame</span><span class="arrow">▸</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-svg"><span class="label">SVG</span></div>
+                <div class="dd-item" data-action="export-bmp"><span class="label">BMP</span></div>
+                <div class="dd-item" data-action="export-png"><span class="label">PNG</span></div>
+                <div class="dd-item" data-action="export-jpg"><span class="label">JPEG</span></div>
+                <div class="dd-item" data-action="export-webp"><span class="label">WebP</span></div>
+              </div>
+            </div>
+            <div class="dd-sep"></div>
+            <div class="dd-item" data-action="export-anim">
+              <span class="dd-icon"><svg><use href="#i-anim"></use></svg></span><span class="label">Animation</span><span class="arrow">▸</span>
+              <div class="submenu" role="menu">
+                <div class="dd-item" data-action="export-smil-svg"><span class="label">SVG + SMIL Animation</span></div>
+                <div class="dd-item" data-action="export-css-svg"><span class="label">SVG + CSS Animation</span></div>
+                <!--<div class="dd-item" data-action="export-rawr"><span class="label">RAWR (Glaxnimate)</span></div>-->
+                <div class="dd-item" data-action="export-webm"><span class="label">WEBM</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="edit" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-edit"></use></svg></span>Edit
+      <div class="dropdown" id="menu-edit" role="menu">
+        <div class="dd-item" id="menu-undo"><span class="dd-icon"><svg><use href="#i-undo"></use></svg></span><span class="label">Undo</span><span class="shortcut">Ctrl+Z</span></div>
+        <div class="dd-item" id="menu-redo"><span class="dd-icon"><svg><use href="#i-redo"></use></svg></span><span class="label">Redo</span><span class="shortcut">Ctrl+Shift+Z</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="cut"><span class="dd-icon"><svg><use href="#i-cut"></use></svg></span><span class="label">Cut</span><span class="shortcut">Ctrl+X</span></div>
+        <div class="dd-item" data-action="copy"><span class="dd-icon"><svg><use href="#i-copy"></use></svg></span><span class="label">Copy</span><span class="shortcut">Ctrl+C</span></div>
+        <div class="dd-item" data-action="paste"><span class="dd-icon"><svg><use href="#i-paste"></use></svg></span><span class="label">Paste</span><span class="shortcut">Ctrl+V</span></div>
+        <div class="dd-item" data-action="duplicate"><span class="dd-icon"><svg><use href="#i-copy"></use></svg></span><span class="label">Duplicate</span><span class="shortcut">Ctrl+D</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="delete"><span class="dd-icon"><svg><use href="#i-trash"></use></svg></span><span class="label">Delete</span><span class="shortcut">Del</span></div>
+        <div class="dd-item" data-action="selectall"><span class="dd-icon"><svg><use href="#i-selectall"></use></svg></span><span class="label">Select All</span><span class="shortcut">Ctrl+A</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="preferences"><span class="dd-icon"><svg><use href="#i-settings"></use></svg></span><span class="label">Preferences</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="view" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-eye"></use></svg></span>View
+      <div class="dropdown" id="menu-view" role="menu">
+        <div class="dd-item" data-action="zoom-in"><span class="dd-icon"><svg><use href="#i-zoomin"></use></svg></span><span class="label">Zoom In</span><span class="shortcut">Ctrl++</span></div>
+        <div class="dd-item" data-action="zoom-out"><span class="dd-icon"><svg><use href="#i-zoomout"></use></svg></span><span class="label">Zoom Out</span><span class="shortcut">Ctrl+-</span></div>
+        
+<div class="dd-item" data-action="zoom-fit">
+  <span class="dd-icon"><svg><use href="#i-fit"></use></svg></span>
+  <span class="label">Fit to Screen</span>
+  <!-- Added stopPropagation to prevent double triggering -->
+  <button id="btn-lock-fit" class="lock-toggle-btn" style="background:none;border:none;cursor:pointer;color:var(--text-muted);margin-left:8px;" onclick="event.stopPropagation(); toggleViewLock(this);">
+    <svg width="16" height="16"><use href="#i-lockopen"></use></svg>
+  </button>
+  <span class="shortcut">5</span>
+</div>
+
+<div class="dd-item" data-action="zoom-100">
+  <span class="label">100%</span>
+  <button id="btn-lock-100" class="lock-toggle-btn" style="background:none;border:none;cursor:pointer;color:var(--text-muted);margin-left:8px;" onclick="event.stopPropagation(); toggleViewLock(this);">
+    <svg width="16" height="16"><use href="#i-lockopen"></use></svg>
+  </button>
+  <span class="shortcut">1</span>
+</div>
+        <div class="dd-item" data-action="center"><span class="label">Center</span><span class="shortcut">0</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-rulers"><span class="dd-icon"><svg><use href="#i-ruler"/></svg></span><span class="label">Rulers</span><span class="shortcut">Ctrl+R</span></div>
+        <div class="dd-item" data-action="toggle-grid"><span class="dd-icon"><svg><use href="#i-grid"/></svg></span><span class="label">Grid</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="toggle-snap"><span class="dd-icon"><svg><use href="#i-snap"/></svg></span><span class="label">Snap to Grid</span></div>
+        <div class="dd-item" data-action="toggle-snap-obj"><span class="dd-icon"><svg><use href="#i-snapobj"/></svg></span><span class="label">Snap to Elements</span></div>
+        <div class="dd-item" data-action="toggle-snap-anc"><span class="dd-icon"><svg><use href="#i-snapanc"/></svg></span><span class="label">Snap to Anchors</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="toggle-guides"><span class="dd-icon"><svg><use href="#i-guides"/></svg></span><span class="label">Guides</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item" data-menu="element" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-layers"></use></svg></span>Element
+      <div class="dropdown" id="menu-object" role="menu">
+        <div class="dd-item" data-action="move-front"><span class="dd-icon"><svg><use href="#i-front"></use></svg></span><span class="label">Bring to Front</span><span class="shortcut">Ctrl+Shift+]</span></div>
+        <div class="dd-item" data-action="move-up"><span class="dd-icon"><svg><use href="#i-arrowup"></use></svg></span><span class="label">Bring Forward</span><span class="shortcut">Ctrl+]</span></div>
+        <div class="dd-item" data-action="move-down"><span class="dd-icon"><svg><use href="#i-arrowdown"></use></svg></span><span class="label">Send Backward</span><span class="shortcut">Ctrl+[</span></div>
+        <div class="dd-item" data-action="move-back"><span class="dd-icon"><svg><use href="#i-back"></use></svg></span><span class="label">Send to Back</span><span class="shortcut">Ctrl+Shift+[</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="group"><span class="dd-icon"><svg><use href="#i-group"></use></svg></span><span class="label">Group</span><span class="shortcut">Ctrl+G</span></div>
+        <div class="dd-item" data-action="ungroup"><span class="dd-icon"><svg><use href="#i-ungroup"></use></svg></span><span class="label">Ungroup</span><span class="shortcut">Ctrl+Shift+G</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="lock"><span class="dd-icon"><svg><use href="#i-lock"></use></svg></span><span class="label">Lock</span><span class="shortcut">Ctrl+L</span></div>
+        <div class="dd-item" data-action="unlock-all"><span class="dd-icon"><svg><use href="#i-lockopen"></use></svg></span><span class="label">Unlock All</span><span class="shortcut">Ctrl+Shift+L</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="bool-union"><span class="dd-icon"><svg><use href="#i-union"/></svg></span><span class="label">Union</span></div>
+        <div class="dd-item" data-action="bool-subtract"><span class="dd-icon"><svg><use href="#i-subtract"/></svg></span><span class="label">Subtract</span></div>
+        <div class="dd-item" data-action="bool-intersect"><span class="dd-icon"><svg><use href="#i-intersect"/></svg></span><span class="label">Intersect</span></div>
+        <div class="dd-item" data-action="bool-exclude"><span class="dd-icon"><svg><use href="#i-exclude"/></svg></span><span class="label">Exclude</span></div>
+    </div>
+  </div>
+      
+    <div class="menu-item" data-menu="help" role="menuitem" tabindex="0" aria-haspopup="true">
+      <span class="mi-icon"><svg><use href="#i-help"/></svg></span>Help
+      <div class="dropdown" id="menu-help" role="menu">
+        <div class="dd-item" data-action="about"><span class="dd-icon"><svg><use href="#i-info"/></svg></span><span class="label">About WebVG</span></div>
+        <div class="dd-item" data-action="shortcuts"><span class="dd-icon"><svg><use href="#i-keyboard"/></svg></span><span class="label">Keyboard Shortcuts</span><span class="shortcut">Ctrl+K</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" data-action="docs"><span class="dd-icon"><svg><use href="#i-book"/></svg></span><span class="label">Documentation</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEFT TOOLBAR -->
+  <section id="LEFT" role="toolbar" aria-label="Tools">
+    <div class="tool-btn active" data-tool="select" data-tip="Select (V)"><svg><use href="#i-cursor"></use></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="rect" data-tip="Rectangle (R)" title="Rectangle (R)"><svg><use href="#i-rect"></use></svg></div>
+    <div class="tool-btn" data-tool="ellipse" data-tip="Ellipse (E)" title="llipse (E)"><svg><use href="#i-circle"></use></svg></div>
+    <div class="tool-btn" data-tool="polygon" data-tip="Polygon (P)" title="Polygon (P)"><svg><use href="#i-polyton"></use></svg></div>
+    <div class="tool-btn" data-tool="line" data-tip="Line (L)" title="Line (L)"><svg><use href="#i-line"></use></svg></div>
+    <div class="tool-btn" data-tool="path" data-tip="Path (W)" title="Path (W)"><svg><use href="#i-wave"></use></svg></div>
+    <div class="tool-btn" data-tool="pen" data-tip="Pen (N)" title="Pen (N)"><svg><use href="#i-pen"></use></svg></div>
+    <!--
+    <div class="tool-btn" data-tool="text" data-tip="Text (X)" title="ext (X)"><svg><use href="#i-text"/></svg></div>
+    -->
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="group" data-tip="Group" title="Group"><svg><use href="#i-group"></use></svg></div>
+    <div class="tool-btn" data-tool="ungroup" data-tip="Ungroup" title="Ungroup"><svg><use href="#i-ungroup"></use></svg></div>
+    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="lock" data-tip="Lock" title="Lock"><svg><use href="#i-lock"></use></svg></div>
+    <div class="tool-btn" data-tool="unlock" data-tip="Unlock" title="Unlock"><svg><use href="#i-lockopen"></use></svg></div>    <div class="tool-sep"></div>
+    <div class="tool-btn" data-tool="bool-union" data-tip="Union" title="Union"><svg><use href="#i-union"/></svg></div>
+    <div class="tool-btn" data-tool="bool-subtract" data-tip="Subtract" title="Subtract"><svg><use href="#i-subtract"/></svg></div>
+    <div class="tool-btn" data-tool="bool-intersect" data-tip="Intersect" title="Intersect"><svg><use href="#i-intersect"/></svg></div>
+    <div class="tool-btn" data-tool="bool-exclude" data-tip="Exclude" title="Exclude"><svg><use href="#i-exclude"/></svg></div>
+ </section>
+
+  <!-- CENTER CANVAS -->
+<section id="CENTER" role="main" aria-label="Canvas">
+  <div id="canvas-grid"></div>
+  <div class="artboard tool-select" id="artboard" style="transform: translate(299.5px, -10px); transform-origin: 0% 0% 0px;">
+    <div id="onion-skin-layer" class="onion-skin-layer"><svg viewBox="0 0 640 480" width="100%" height="100%" style="position: absolute; inset: 0px; pointer-events: none; opacity: 0.35; mix-blend-mode: multiply; display: block;"><rect x="80" y="100" width="180" height="130" rx="8" ry="8" fill="#e8a634" fill-opacity="0.5"></rect><ellipse cx="420" cy="220" rx="100" ry="80" fill="#3a8fd4" fill-opacity="1"></ellipse><polygon points="370,280 430.6217782649107,332.5 309.3782217350893,332.5" fill="#5cb85c" fill-opacity="1"></polygon><path d="M 40.0 120.0 C 40.0 170.0, 100.0 200.0, 100.0 150.0 C 50.0 150.0, 110.0 120.0, 160.0 120.0" stroke="#800000" stroke-width="3" stroke-opacity="1" fill="none" style="mix-blend-mode: normal;"></path><path d="M 200.0 300.0 L 400.0 300.0" stroke="#0000ff" stroke-width="2" stroke-opacity="1" fill="#e8a634" fill-opacity="1" fill-rule="nonzero" style="mix-blend-mode: normal;"></path></svg><svg viewBox="0 0 640 480" width="100%" height="100%" style="position: absolute; inset: 0px; pointer-events: none; opacity: 0.2; mix-blend-mode: multiply; display: block;"><rect x="80" y="100" width="180" height="130" rx="8" ry="8" fill="#e8a634" fill-opacity="0.5"></rect><ellipse cx="420" cy="220" rx="100" ry="80" fill="#3a8fd4" fill-opacity="1"></ellipse><polygon points="370,280 430.6217782649107,332.5 309.3782217350893,332.5" fill="#5cb85c" fill-opacity="1"></polygon><path d="M 40.0 120.0 C 40.0 170.0, 100.0 200.0, 100.0 150.0 C 50.0 150.0, 110.0 120.0, 160.0 120.0" stroke="#800000" stroke-width="3" stroke-opacity="1" fill="none" style="mix-blend-mode: normal;"></path><path d="M 200.0 300.0 L 400.0 300.0" stroke="#0000ff" stroke-width="2" stroke-opacity="1" fill="#e8a634" fill-opacity="1" fill-rule="nonzero" style="mix-blend-mode: normal;"></path></svg></div>
+    <svg id="main-svg" ...="" viewBox="0 0 640 480" style="width: 100%; height: 100%; pointer-events: visiblepainted;"><rect x="80" y="100" width="180" height="130" rx="8" ry="8" fill="#e8a634" fill-opacity="0.5" data-id="1"></rect><ellipse cx="420" cy="220" rx="100" ry="80" fill="#3a8fd4" fill-opacity="1" data-id="2"></ellipse><polygon points="370,280 430.6217782649107,332.5 309.3782217350893,332.5" fill="#5cb85c" fill-opacity="1" data-id="3"></polygon><path d="M 40.0 120.0 C 40.0 170.0, 100.0 200.0, 100.0 150.0 C 50.0 150.0, 110.0 120.0, 160.0 120.0" stroke="#800000" stroke-width="3" stroke-opacity="1" fill="none" fill-opacity="1" fill-rule="nonzero" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: visiblepainted;" data-id="4"></path><path d="M 200.0 300.0 L 400.0 300.0" stroke="#0000ff" stroke-width="2" stroke-opacity="1" fill="#e8a634" fill-opacity="1" fill-rule="nonzero" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: visiblepainted;" data-id="5"></path></svg>
+    -      <div class="sel-box" style="left:80px; top:100px; width:180px; height:130px;">
+        <div class="sel-rotate-line"></div>
+        <div class="sel-rotate-handle"></div>
+        <div class="sel-handle nw" style="left:0;top:0;"></div>
+        <div class="sel-handle ne" style="left:180px;top:0;"></div>
+        <div class="sel-handle sw" style="left:0;top:130px;"></div>
+        <div class="sel-handle se" style="left:180px;top:130px;"></div>
+        <div class="sel-handle n" style="left:90px;top:0;"></div>
+        <div class="sel-handle s" style="left:90px;top:130px;"></div>
+        <div class="sel-handle w" style="left:0;top:65px;"></div>
+        <div class="sel-handle e" style="left:180px;top:65px;"></div>
+
+      <div class="sel-pivot" style="left: 50%; top: 50%;" data-handle="pivot" title="Drag to move pivot · Double-click to reset"><div class="sel-pivot-h"></div><div class="sel-pivot-v"></div><div class="sel-pivot-inner"></div></div>-
+      </div>
+  </div>
+  <div id="selection-overlay" style="transform: translate(299.5px, -10px); width: 640px; height: 480px; left: 0px; top: 0px; --inv-scale: 1;"></div>
+</section>
+
+<!-- BOTTOM: The Timeline Section -->
+<section id="BOTTOM" aria-label="Timeline">
+  <div id="timeline-container">
+    <div class="timeline-controls">
+      <button class="t-btn" id="btn-play" title="Play/Stop (Space)">
+        <svg width="14" height="14"><use href="#i-play"></use></svg>
+      </button>
+      <button class="t-btn" id="btn-stop" title="Stop">
+        <svg width="14" height="14"><use href="#i-stop"></use></svg>
+      </button>
+      
+      <span class="t-label">Frame:</span>
+      <input type="number" id="current-frame-input" class="t-input" value="1" min="1">
+      <span class="t-label">/</span>
+      <input type="number" id="total-frames-input" class="t-input" value="24" min="2" max="1000">
+      
+      <span class="t-label">FPS:</span>
+      <input type="number" id="fps-input" class="t-input" value="12" min="1" max="60">
+      
+      <div class="t-range-group">
+        <span class="t-label">Onion:</span>
+        <input type="number" id="onion-before" class="t-input" value="2" min="0" max="10" title="Frames Before">
+        <span class="t-label">-</span>
+        <input type="number" id="onion-after" class="t-input" value="2" min="0" max="10" title="Frames After">
+      </div>
+    </div>
+    
+  <div class="timeline-tracks-container" id="timeline-tracks-container">
+    <div class="timeline-track-row" data-element-id="1">
+      <div class="track-label active" title="Rectangle 1" style="padding-left: 8px;">
+        <span style="width: 14px; flex-shrink: 0;"></span>Rectangle 1
+      </div>
+      <div class="track-cells" style="width: 480px;">
+        <div class="track-frame-cell active keyframe" data-frame-type="keyframe">
+          <div class="frame-indicator-square">
+            <svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" fill="#e8a634"></rect></svg>
+          </div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="timeline-track-row" data-element-id="2">
+      <div class="track-label" title="Ellipse 2" style="padding-left: 8px;">
+        <span style="width: 14px; flex-shrink: 0;"></span>Ellipse 2
+      </div>
+      <div class="track-cells" style="width: 480px;">
+        <div class="track-frame-cell active keyframe" data-frame-type="keyframe">
+          <div class="frame-indicator-square">
+            <svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" fill="#e8a634"></rect></svg>
+          </div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="timeline-track-row" data-element-id="3">
+      <div class="track-label" title="Triangle 3" style="padding-left: 8px;">
+        <span style="width: 14px; flex-shrink: 0;"></span>Triangle 3
+      </div>
+      <div class="track-cells" style="width: 480px;">
+        <div class="track-frame-cell active keyframe" data-frame-type="keyframe">
+          <div class="frame-indicator-square">
+            <svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" fill="#e8a634"></rect></svg>
+          </div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="timeline-track-row" data-element-id="4">
+      <div class="track-label" title="Path 4" style="padding-left: 8px;">
+        <span style="width: 14px; flex-shrink: 0;"></span>Path 4
+      </div>
+      <div class="track-cells" style="width: 480px;">
+        <div class="track-frame-cell active keyframe" data-frame-type="keyframe">
+          <div class="frame-indicator-square">
+            <svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" fill="#e8a634"></rect></svg>
+          </div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="timeline-track-row" data-element-id="5">
+      <div class="track-label" title="Line 5" style="padding-left: 8px;">
+        <span style="width: 14px; flex-shrink: 0;"></span>Line 5
+      </div>
+      <div class="track-cells" style="width: 480px;">
+        <div class="track-frame-cell active keyframe" data-frame-type="keyframe">
+          <div class="frame-indicator-square">
+            <svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" fill="#e8a634"></rect></svg>
+          </div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+        <div class="track-frame-cell" data-frame-type="empty">
+          <div style="width: 4px; height: 4px; background: rgb(204, 204, 204); border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+  <!-- RIGHT PANEL -->
+  <section id="RIGHT" aria-label="Properties">
+    <div class="prop-btn active" data-panel="options" data-tip="Options"><svg><use href="#i-tune"></use></svg></div>
+    <div class="prop-btn" data-panel="geometry" data-tip="Geometry"><svg><use href="#i-geometry"></use></svg></div>
+    <div class="prop-btn" data-panel="appearance" data-tip="Appearance"><svg><use href="#i-droplet"></use></svg></div>
+    <div class="prop-btn" data-panel="layers" data-tip="Elements"><svg><use href="#i-list"></use></svg></div>
+  </section>
+</div>
+
+<!-- RIGHT FLYOUT -->
+<div id="right-flyout" class="show">
+    <div class="flyout-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Properties</span>
+      <button id="btn-flyout-pin" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0 4px;" title="Pin panel open" onclick="event.stopPropagation(); toggleFlyoutLock(this);">
+        <svg width="14" height="14"><use href="#i-lockopen"></use></svg>
+    </button>
+  </div>
+  <div class="flyout-body" id="flyout-body">
+    <div class="section" data-section="options">
+      <div class="section-head"><span class="title">Options</span><span class="chevron"><svg><use href="#i-chevron"></use></svg></span></div>
+      <div class="section-body">
+        <div class="color-row">
+          <div class="color-swatch" id="swatch-fill" style="background:#e8a634"><input type="color" id="prop-fill" value="#e8a634" aria-label="Fill color"></div>
+          <span class="color-label">Fill</span>
+          <div style="flex:1"></div>
+          <div class="color-swatch" id="swatch-stroke" style="background:#000000"><input type="color" id="prop-stroke" value="#000000" aria-label="Stroke color"></div>
+          <span class="color-label">Stroke</span>
+        </div>
+        <div class="field">
+          <label>S.W.</label>
+          <input type="number" id="prop-strokew" value="0" min="0" max="100" step="0.5" aria-label="Stroke width">
+        </div>
+      </div>
+    </div>
+    <div class="section" data-section="geometry">
+      <div class="section-head"><span class="title">Geometry</span><span class="chevron"><svg><use href="#i-chevron"></use></svg></span></div>
+      <div class="section-body">
+        <div class="field-row">
+          <div class="field"><label>X</label><input type="number" id="prop-x" value="80" aria-label="X position"></div>
+          <div class="field"><label>Y</label><input type="number" id="prop-y" value="100" aria-label="Y position"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>W</label><input type="number" id="prop-w" value="180" min="1" aria-label="Width"></div>
+          <div class="field"><label>H</label><input type="number" id="prop-h" value="130" min="1" aria-label="Height"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>P.X</label><input type="number" id="prop-px" value="170" aria-label="Pivot X"></div>
+          <div class="field"><label>P.Y</label><input type="number" id="prop-py" value="165" aria-label="Pivot Y"></div>
+        </div>
+      <!--
+        <div class="field">
+          <label style="font-size:13px;">&#x21BB;</label>
+          <input type="number" id="prop-rot" value="0" min="-360" max="360" step="1" aria-label="Rotation">
+          <span style="font-size:10px; color:var(--text-dim);">deg</span>
+        </div>
+      -->  
+        <div class="field-row">
+          <div class="field"><label>R</label><input type="number" id="prop-rx" value="8" min="0" aria-label="Corner radius"></div>
+          <div class="field"><label>S</label><input type="number" id="prop-sides" value="5" min="3" max="64" step="1" aria-label="Sides"></div>
+        </div>
+      </div>
+    </div>
+    <div class="section" data-section="appearance">
+      <div class="section-head"><span class="title">Opacity &amp; Blend</span><span class="chevron"><svg><use href="#i-chevron"></use></svg></span></div>
+      <div class="section-body">
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Fill</label>
+          <input type="range" class="field-ctrl" id="prop-fillop" min="0" max="100" value="50" aria-label="Fill Opacity">
+          <span class="range-val" id="val-fillop">50%</span>
+        </div>
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Stroke</label>
+          <input type="range" class="field-ctrl" id="prop-strokeop" min="0" max="100" value="100" aria-label="Stroke Opacity">
+          <span class="range-val" id="val-strokeop">100%</span>
+        </div>
+        <div class="field">
+          <label style="font-size:11px; width:auto;">Blend</label>
+          <select class="field-ctrl" id="prop-blend" aria-label="Blend mode">
+            <option selected="selected">Normal</option><option>Multiply</option><option>Screen</option><option>Overlay</option><option>Darken</option><option>Lighten</option><option>Color Dodge</option><option>Color Burn</option><option>Hard Light</option><option>Soft Light</option><option>Difference</option><option>Exclusion</option><option>Hue</option><option>Saturation</option><option>Color</option><option>Luminosity</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layers-header">
+    <span class="title">Elements</span>
+    <div class="actions">
+      <!--
+      <button title="New Element" aria-label="New element" id="btn-elem-add"><svg><use href="#i-plus"/></svg></button>
+      -->
+      <button title="Delete Element" aria-label="Delete element" id="btn-elem-del"><svg><use href="#i-trash"></use></svg></button>
+    </div>
+  </div>
+  <div class="elem-list" id="elem-list"><div class="elem-item selected" data-elem-id="1" style="padding-left: 12px;" draggable="true"><span style="width: 14px; flex-shrink: 0;"></span><span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"></use></svg></span><span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"></use></svg></span><span class="elem-color" style="background: rgb(232, 166, 52);"></span><span class="elem-name">Rectangle 1</span></div><div class="elem-item" data-elem-id="2" style="padding-left: 12px;" draggable="true"><span style="width: 14px; flex-shrink: 0;"></span><span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"></use></svg></span><span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"></use></svg></span><span class="elem-color" style="background: rgb(58, 143, 212);"></span><span class="elem-name">Ellipse 2</span></div><div class="elem-item" data-elem-id="3" style="padding-left: 12px;" draggable="true"><span style="width: 14px; flex-shrink: 0;"></span><span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"></use></svg></span><span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"></use></svg></span><span class="elem-color" style="background: rgb(92, 184, 92);"></span><span class="elem-name">Triangle 3</span></div><div class="elem-item" data-elem-id="4" style="padding-left: 12px;" draggable="true"><span style="width: 14px; flex-shrink: 0;"></span><span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"></use></svg></span><span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"></use></svg></span><span class="elem-color" style="background: rgb(128, 0, 0);"></span><span class="elem-name">Path 4</span></div><div class="elem-item" data-elem-id="5" style="padding-left: 12px;" draggable="true"><span style="width: 14px; flex-shrink: 0;"></span><span class="elem-vis" title="Toggle visibility"><svg><use href="#i-eye"></use></svg></span><span class="elem-lock" title="Toggle lock"><svg><use href="#i-lockopen"></use></svg></span><span class="elem-color" style="background: rgb(232, 166, 52);"></span><span class="elem-name">Line 5</span></div></div>
+</div>
+
+<!-- Hidden inputs for file operations -->
+<input type="file" id="file-open-input" accept=".json" style="display:none">
+<input type="file" id="file-import-svg" accept=".svg,image/svg+xml" style="display:none">
+<input type="file" id="file-import-image" accept="image/png,image/jpeg,image/jpg,image/webp,image/bmp" style="display:none">
+<input type="file" id="file-save-input" accept=".json" style="display:none">
+
+<!-- Add this BEFORE </body> tag, after other modals -->
+<div id="progress-modal" class="modal-overlay">
+  <div class="modal-content" style="width: 500px;">
+    <div class="modal-header">
+      <span class="modal-title">Exporting Animation</span>
+      <button class="modal-close" onclick="cancelExport()">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom: 12px; color: var(--text-muted);">
+        Encoding frames... Please wait.
+      </div>
+      <!-- 🔴 PROGRESS BAR CONTAINER -->
+      <div id="progress-container" style="
+        width: 100%; 
+        height: 8px; 
+        background: var(--bg-dark); 
+        border: 1px solid var(--border); 
+        border-radius: 4px; 
+        overflow: hidden;
+        margin-bottom: 12px;">
+        <!-- 🔴 PROGRESS FILL -->
+        <div id="progress-fill" style="
+          width: 0%; 
+          height: 100%; 
+          background: var(--accent); 
+          transition: width 0.1s ease-out;">
+        </div>
+      </div>
+      <div id="progress-text" style="font-size: 11px; color: var(--text-dim); text-align: right;">
+        0 / 0 frames
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span id="progress-status" style="color: var(--text-muted); font-size: 11px;"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+    const DEBUG = true;
+    
+    
+  /* ═══ Menu System ═══ */
+  const menuItems = document.querySelectorAll('.menu-item[data-menu]');
+  const overlay = document.getElementById('menu-overlay');
+  let activeMenu = null, menuTimeout = null;
+
+  function openMenu(item) {
+    closeAllMenus();
+    const dd = item.querySelector('.dropdown');
+    if (!dd) return;
+    dd.classList.add('show');
+    item.classList.add('open');
+    activeMenu = item;
+    overlay.classList.add('show');
+  }
+  function closeAllMenus() {
+    clearTimeout(menuTimeout);
+    document.querySelectorAll('.dropdown.show').forEach(d => d.classList.remove('show'));
+    document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+    activeMenu = null;
+    overlay.classList.remove('show');
+  }
+
+  menuItems.forEach(item => {
+    item.addEventListener('click', e => { e.stopPropagation(); item.classList.contains('open') ? closeAllMenus() : openMenu(item); });
+    item.addEventListener('mouseenter', () => { if (activeMenu && activeMenu !== item) { clearTimeout(menuTimeout); openMenu(item); } });
+  });
+  overlay.addEventListener('click', closeAllMenus);
+  document.querySelectorAll('.dd-item[data-action]').forEach(item => {
+    item.addEventListener('click', e => { e.stopPropagation(); if (item.querySelector('.submenu')) return; closeAllMenus(); showToast(item.dataset.action); });
+  });
+
+  /* ═══ Toast ═══ */
+  let toastEl = null;
+  function showToast(action) {
+    if (toastEl) toastEl.remove();
+    toastEl = document.createElement('div');
+    toastEl.textContent = action.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    Object.assign(toastEl.style, { position:'fixed', bottom:'32px', left:'50%', transform:'translateX(-50%)', background:'#2d2d30', color:'#ccc', padding:'6px 16px', borderRadius:'6px', fontSize:'12px', border:'1px solid #454545', boxShadow:'0 4px 16px rgba(0,0,0,0.4)', zIndex:'9999', opacity:'0', transition:'opacity 0.2s' });
+    document.body.appendChild(toastEl);
+    requestAnimationFrame(() => toastEl.style.opacity = '1');
+    setTimeout(() => { if (toastEl) { toastEl.style.opacity = '0'; setTimeout(() => toastEl && toastEl.remove(), 200); } }, 1800);
+  }
+
+  /* ═══ Tool Selection ═══ */
+  const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+  toolBtns.forEach(btn => { btn.addEventListener('click', () => { toolBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active'); }); });
+  const toolKeys = { v:'select', r:'rect', e:'ellipse', p:'polygon', l:'line', w:'freehand', n:'pen' };
+  document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; const btn = document.querySelector(`.tool-btn[data-tool="${toolKeys[e.key.toLowerCase()]}"]`); if (btn) btn.click(); });
+
+  /* ═══ Right Panel Flyout ═══ */
+  const rightPanel = document.getElementById('RIGHT'), flyout = document.getElementById('right-flyout');
+  let flyoutTimeout = null;
+  rightPanel.addEventListener('mouseenter', () => { clearTimeout(flyoutTimeout); flyout.classList.add('show'); });
+  rightPanel.addEventListener('mouseleave', () => { flyoutTimeout = setTimeout(() => { if (!flyout.matches(':hover')) flyout.classList.remove('show'); }, 200); });
+  flyout.addEventListener('mouseleave', () => { flyoutTimeout = setTimeout(() => { if (!rightPanel.matches(':hover')) flyout.classList.remove('show'); }, 200); });
+  flyout.addEventListener('mouseenter', () => { clearTimeout(flyoutTimeout); });
+
+  /* ═══ Section Collapse ═══ */
+  document.querySelectorAll('.section-head').forEach(head => { head.addEventListener('click', () => head.closest('.section').classList.toggle('collapsed')); });
+
+  /* ═══ Property Buttons ═══ */
+  document.querySelectorAll('.prop-btn[data-panel]').forEach(btn => {
+    btn.addEventListener('click', () => { const s = document.querySelector(`.section[data-section="${btn.dataset.panel}"]`); if (s) { s.classList.contains('collapsed') ? s.classList.remove('collapsed') : s.scrollIntoView({ behavior:'smooth', block:'nearest' }); } });
+  });
+
+  /* ═══ Layer Toggles ═══ */
+  document.querySelectorAll('.elem-vis').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const use = btn.querySelector('use');
+      if (btn.classList.contains('off')) { btn.classList.remove('off'); use.setAttribute('href', '#i-eye'); }
+      else { btn.classList.add('off'); use.setAttribute('href', '#i-eye-off'); }
+    });
+  });
+  document.querySelectorAll('.elem-lock').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const use = btn.querySelector('use');
+      if (btn.classList.contains('locked')) { btn.classList.remove('locked'); use.setAttribute('href', '#i-lockopen'); }
+      else { btn.classList.add('locked'); use.setAttribute('href', '#i-lock'); }
+    });
+  });
+
+  /* ═══ Layer Selection ═══ */
+  document.querySelectorAll('.elem-item').forEach(item => {
+    item.addEventListener('click', e => { if (e.target.closest('.elem-vis') || e.target.closest('.elem-lock')) return; document.querySelectorAll('.elem-item').forEach(l => l.classList.remove('selected')); item.classList.add('selected'); });
+  });
+
+  /* ═══ Opacity Slider ═══ */
+  const opacitySlider = document.querySelector('input[type="range"]'), opacityVal = document.querySelector('.range-val');
+  if (opacitySlider && opacityVal) opacitySlider.addEventListener('input', () => { opacityVal.textContent = opacitySlider.value + '%'; });
+
+  /* ═══ Drag & Drop ═══ */
+  let dropIndicator = null;
+  document.addEventListener('dragover', e => { e.preventDefault(); if (!dropIndicator) { dropIndicator = document.createElement('div'); Object.assign(dropIndicator.style, { position:'fixed', inset:'0', zIndex:'10000', background:'rgba(232,166,52,0.06)', border:'2px dashed var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none', color:'var(--accent)', fontSize:'16px', fontWeight:'600', letterSpacing:'1px' }); dropIndicator.textContent = 'DROP TO OPEN OR IMPORT'; document.body.appendChild(dropIndicator); } });
+  document.addEventListener('dragleave', e => { if (e.relatedTarget === null && dropIndicator) { dropIndicator.remove(); dropIndicator = null; } });
+  document.addEventListener('drop', e => { e.preventDefault(); if (dropIndicator) { dropIndicator.remove(); dropIndicator = null; } const f = e.dataTransfer.files; if (f.length) { const n = f[0].name, x = n.split('.').pop().toLowerCase(); showToast(x === 'svg' ? 'Open SVG: ' + n : ['png','jpg','jpeg','gif','bmp','webp'].includes(x) ? 'Import Image: ' + n : 'Import File: ' + n); } });
+</script>
+</body>
+</html>
