@@ -22,6 +22,11 @@ Features:
 - Group
 - Lock
 
+Test:
+
+- [Mockup11](https://github.com/hyperagon/WebVG/blob/main/4/mockup11.html)
+- [Mockup10](https://github.com/hyperagon/WebVG/blob/main/3/mockup10.html)
+
 TODO:
 - Scale Test (repeat the animation of a scale, Jaiden did one with smilies and frownies)
 - Bell Test (repeat the [animation done in Friction of a Bell](https://www.youtube.com/watch?v=8yJYGObFYjM))
