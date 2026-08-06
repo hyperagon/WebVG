@@ -26,6 +26,7 @@ Test:
 
 - [Mockup11](https://github.com/hyperagon/WebVG/blob/main/4/mockup11.html)
 - [Mockup10](https://github.com/hyperagon/WebVG/blob/main/3/mockup10.html)
+- [Any other mockup](https://github.com/hyperagon/WebVG/blob/main/3/)
 
 TODO:
 - Scale Test (repeat the animation of a scale, Jaiden did one with smilies and frownies)
