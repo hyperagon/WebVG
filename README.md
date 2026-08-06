@@ -1,7 +1,7 @@
 # WebVG
 ### Web Vector Graphics
 
-An [SVG](https://en.wikipedia.org/wiki/SVG) animation editor inspired by [Inkscape](https://inkscape.org/), [Glaxnimate](https://glaxnimate.org/), [Friction Graphics](https://friction.graphics/), the [Wick Editor](https://www.wickeditor.com/#/), [Slidus](https://github.com/hyperagon/Slidus), [Krita](https://krita.org/en/) and [Tahoma2D](https://tahoma2d.org/).
+An (mostly) vibe-coded [SVG](https://en.wikipedia.org/wiki/SVG) animation editor inspired by [Inkscape](https://inkscape.org/), [Glaxnimate](https://glaxnimate.org/), [Friction Graphics](https://friction.graphics/), the [Wick Editor](https://www.wickeditor.com/#/), [Slidus](https://github.com/hyperagon/Slidus), [Krita](https://krita.org/en/) and [Tahoma2D](https://tahoma2d.org/).
 
 Features:
 - Offline
@@ -24,7 +24,7 @@ Features:
 
 TODO:
 - Scale Test (repeat the animation of a scale, Jaiden did one with smilies and frownies)
-- Bell Test (repeat the animation done in Friction of a Bell)
+- Bell Test (repeat the [animation done in Friction of a Bell](https://www.youtube.com/watch?v=8yJYGObFYjM))
 - Boolean actions (Union, Subtract, Intersect, Division)
 - Line-rail (Ctrl) [Not worth it, we got Pen for that]
 - Path-rail (Ctrl) [Not worth it, we got Path for that]
