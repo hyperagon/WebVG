@@ -29,7 +29,7 @@ Test:
 - [Previous mockups](https://github.com/hyperagon/WebVG/blob/main/3/)
 
 TODO:
-- Scale Test (repeat the animation of a scale, Jaiden did one with smilies and frownies)
+- Scale Test (repeat the animation of a scale, [Jaiden](https://www.youtube.com/channel/UCGwu0nbY2wSkW8N-cghnLpA) did one with smilies and frownies)
 - Bell Test (repeat the [animation done in Friction of a Bell](https://www.youtube.com/watch?v=8yJYGObFYjM))
 - Boolean actions (Union, Subtract, Intersect, Division)
 - Line-rail (Ctrl) [Not worth it, we got Pen for that]
